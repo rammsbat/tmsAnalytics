@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "tms-oracle-readonly": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${workspaceFolder}/tools/oracle_mcp",
+        "python",
+        "server.py"
+      ],
+      "timeout": 60000,
+      "alwaysAllow": ["list_objects", "describe_object"]
+    }
+  }
+}

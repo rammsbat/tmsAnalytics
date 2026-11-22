@@ -24,3 +24,5 @@ valkey_data/
 .bob/tmp/
 *.dmp
 *.dump
+
+tools/**/.venv/

@@ -22,3 +22,6 @@ valkey_data/
 # Logs y temporales
 *.log
 .bob/tmp/
+
+# Entornos virtuales de herramientas locales
+tools/**/.venv/
