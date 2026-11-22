@@ -1,0 +1,27 @@
+# Git
+.git/
+.gitignore
+
+# Environment and secrets
+.env
+*.env
+
+# Persistent storage & databases
+oracle_data/
+postgres_data/
+
+# Python cache and virtualenvs
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# dbt artifacts
+target/
+dbt_packages/
+
+# Logs and temporary files
+*.log
+.bob/tmp/

@@ -1,0 +1,164 @@
+# docker-compose.yml - Plataforma Analytics TMS
+# Infraestructura: Oracle Free 23ai + PostgreSQL 16 + Valkey 8 + Apache Superset (Thin Mode)
+
+name: analytics-tms
+
+x-superset-common: &superset-common
+  image: analytics-tms-superset:local
+  build:
+    context: .
+    dockerfile: superset/Dockerfile
+  user: "superset"
+  environment:
+    SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+    SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    SUPERSET_ADMIN_USER: ${SUPERSET_ADMIN_USER:-admin}
+    SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+    SUPERSET_ADMIN_FIRSTNAME: ${SUPERSET_ADMIN_FIRSTNAME:-Admin}
+    SUPERSET_ADMIN_LASTNAME: ${SUPERSET_ADMIN_LASTNAME:-User}
+    SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@tms.local}
+    POSTGRES_DB: ${POSTGRES_DB:-superset}
+    POSTGRES_USER: ${POSTGRES_USER:-superset}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_HOST: superset-db
+    POSTGRES_PORT: "5432"
+    VALKEY_HOST: ${VALKEY_HOST:-superset-valkey}
+    VALKEY_PORT: ${VALKEY_PORT:-6379}
+    BI_READER_PWD: ${BI_READER_PWD}
+  volumes:
+    - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+  networks:
+    - tms-internal-net
+  restart: unless-stopped
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Oracle Database Free (Dev / Staging Local)
+  # ---------------------------------------------------------------------------
+  oracle-dw:
+    image: gvenzl/oracle-free:23-slim
+    container_name: tms-oracle-dw
+    shm_size: 1g
+    ports:
+      - "1521:1521"
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PWD}
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./oracle/init:/container-entrypoint-initdb.d:ro
+    networks:
+      - tms-internal-net
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # 2. PostgreSQL 16 (Metastore de Superset)
+  # ---------------------------------------------------------------------------
+  superset-db:
+    image: postgres:16-alpine
+    container_name: tms-superset-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-superset}
+      POSTGRES_USER: ${POSTGRES_USER:-superset}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tms-internal-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-superset}", "-d", "${POSTGRES_DB:-superset}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # 3. Valkey 8 (Caché y Broker Celery - Licencia $0 BSD-3, sin Redis)
+  # ---------------------------------------------------------------------------
+  superset-valkey:
+    image: valkey/valkey:8-alpine
+    container_name: tms-superset-valkey
+    networks:
+      - tms-internal-net
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # 4. Apache Superset Web Application
+  # ---------------------------------------------------------------------------
+  superset-app:
+    <<: *superset-common
+    container_name: tms-superset-app
+    command: ["/bin/bash", "/app/bootstrap.sh"]
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/bootstrap.sh:/app/bootstrap.sh:ro
+      - ./superset/assets:/app/assets
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      superset-valkey:
+        condition: service_healthy
+      oracle-dw:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8088/health')\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # 5. Superset Celery Worker (Consultas Asíncronas)
+  # ---------------------------------------------------------------------------
+  superset-worker:
+    <<: *superset-common
+    container_name: tms-superset-worker
+    command: ["celery", "--app=superset.tasks.celery_app:app", "worker", "-O", "fair", "-c", "2"]
+    healthcheck:
+      disable: true
+    depends_on:
+      superset-app:
+        condition: service_healthy
+      superset-db:
+        condition: service_healthy
+      superset-valkey:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # 6. Superset Celery Beat (Tareas Programadas)
+  # ---------------------------------------------------------------------------
+  superset-beat:
+    <<: *superset-common
+    container_name: tms-superset-beat
+    command: ["celery", "--app=superset.tasks.celery_app:app", "beat", "--pidfile", "/tmp/celerybeat.pid", "-s", "/tmp/celerybeat-schedule"]
+    healthcheck:
+      disable: true
+    depends_on:
+      superset-app:
+        condition: service_healthy
+      superset-db:
+        condition: service_healthy
+      superset-valkey:
+        condition: service_healthy
+
+networks:
+  tms-internal-net:
+    driver: bridge
+
+volumes:
+  oracle_data:
+  postgres_data:

@@ -6,8 +6,21 @@ Los nombres de bloque siguen el PDF. La fuente de hecho de cada KPI es una **pro
 
 ## Notas de interpretación
 - **Flota (D4):** el PDF muestra 9 unidades (5 con viaje = 56%, 4 sin viaje = 44%, 0 inactivas). La spec y el docx usan 100 unidades con los mismos porcentajes. `fleet_size: 100` es decisión de la spec, no del Draft.
-- **Columna "Costo/Km.":** en el PDF es Facturación ÷ Kms (ej. $89,088 ÷ 595 = $149.7277 para ECO01), no un costo. Los costos reales (Operador, Mantenimiento, Otros Gastos, Total Costo) están en $0.00 en todo el reporte.
-- **Orden de columnas en las tablas de productividad:** el texto extraído del PDF es ambiguo. Por las sumas del total, la primera columna numérica suma 22 (= Despachos del mes) y la segunda suma 17 (= Cierres del mes). **Verificar visualmente contra el PDF antes de fijar los nombres de columna del dataset.**
+- **Columna "Costo/Km.":** en el PDF es Facturación ÷ Kms (ej. $89,088 ÷ 595 = $149.7277 para ECO01), no un costo. Los costos reales (Operador, Mantenimiento, Otros Gastos, Total Costo) están en $0.00 en todo el reporte. El nombre técnico en SQL para esta métrica es `facturacion_por_km`.
+- **Orden confirmado de columnas en las tablas de productividad (Bloques 6 y 7):**
+  1. `Unidad` (Bloque 6) / `Clave/Nombre` (Bloque 7)
+  2. `Despachos Viajes`
+  3. `Cerrados`
+  4. `Kms. Cargado`
+  5. `Kms. Vacío`
+  6. `Kms. Total`
+  7. `Total Facturación`
+  8. `Costo/Km.` (Facturación / Kms $\rightarrow$ SQL: `facturacion_por_km`)
+  9. `Rendimiento prom. (Kms/Kw)`
+  10. `Operador`
+  11. `Mantenimiento`
+  12. `Otros Gastos`
+  13. `Total Costo`
 
 ## 1. Indicadores Diarios de Flota — `FACT_SNAPSHOT_FLOTA_DIARIO`
 | KPI | Total | % | Hecho |
@@ -61,13 +74,13 @@ Unidades con datos en el PDF: ECO01 a ECO06 (6 unidades).
 | ECO05 | $90,016.00 | 5.04 | 394 |
 | ECO06 | $81,664.00 | 5.86 | 341 |
 | **Total** | **$492,768.00** | **6.35** | **3,710** |
-- Columnas del reporte: Despachos, Cerrados, Kms (Total, Vacío, Cargado), Facturación, Rendimiento, Facturación/Km, Operador, Mantenimiento, Otros Gastos, Total Costo.
+- Columnas del reporte (orden exacto confirmado): `Unidad`, `Despachos Viajes`, `Cerrados`, `Kms. Cargado`, `Kms. Vacío`, `Kms. Total`, `Total Facturación`, `Costo/Km.` (SQL: `facturacion_por_km`), `Rendimiento prom. (Kms/Kw)`, `Operador`, `Mantenimiento`, `Otros Gastos`, `Total Costo`.
 - Hechos combinados por CTE: `FACT_DESPACHO_VIAJE`, `FACT_LINEAS_CARGA_CARTAPORTE`, `FACT_FACTURACION_FLETE`, `FACT_GASTOS_LIQUIDACION`.
 - [ ] Tabla con `FULL OUTER JOIN` entre CTE, sin joins directos entre hechos
 - [ ] Conciliación: total facturación = $492,768.00; total Kms = 3,710 (Vacío 0, Cargado 3,710)
 
 ## 7. Productividad de los Operadores (Mes) — Drill-Across
-Operadores con datos en el PDF: 15 (total de operadores = 15). Mismas columnas que el bloque 6, por operador (clave y nombre).
+Operadores con datos en el PDF: 15 (total de operadores = 15). Mismas columnas que el bloque 6, por operador (`Clave/Nombre`, `Despachos Viajes`, `Cerrados`, `Kms. Cargado`, `Kms. Vacío`, `Kms. Total`, `Total Facturación`, `Costo/Km.` [SQL: `facturacion_por_km`], `Rendimiento prom. (Kms/Kw)`, `Operador`, `Mantenimiento`, `Otros Gastos`, `Total Costo`).
 - [ ] Tabla con `FULL OUTER JOIN` entre CTE
 - [ ] Conciliación: total facturación = $492,768.00; total Kms = 3,710
 

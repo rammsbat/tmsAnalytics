@@ -42,13 +42,13 @@ Estas convenciones complementan (no reemplazan) las reglas globales de `.bob/rul
 | `FACT_LINEAS_CARGA_CARTAPORTE` | Una fila por partida de mercancía amparada en CFDI. Degeneradas: `UUID_CCP`, `NUMERO_TALON`, `UNIDAD_EMBARQUE_UE`. |
 | `FACT_SNAPSHOT_FLOTA_DIARIO` | Un registro por vehículo del inventario por día calendario. |
 
-### 4.2 Sin grano declarado en el docx (Matriz de Bus, §4, procesos 5 y 6)
+### 4.2 Grano confirmado para procesos 5 y 6 (Matriz de Bus)
 
-El docx lista para estos procesos las dimensiones y las degeneradas, pero no define el grano. El grano indicado es una **propuesta inferida** de las degeneradas, **pendiente de validación del Data Architect**. No debe tratarse como dato del docx.
+Confirmado por arquitectura para Fase 2 y Fase 5:
 
-| Hecho | Dimensiones (Matriz de Bus) | Degeneradas | Grano propuesto (pendiente de validación) |
+| Hecho | Dimensiones (Matriz de Bus) | Degeneradas | Grano Confirmado |
 | :--- | :--- | :--- | :--- |
-| `FACT_FACTURACION_FLETE` (proceso 5, "Facturación Comercial Flete") | Fecha, Vehículo, Operador, Cliente, Ubicación (rol Destino) | `UUID_INGRESO`, `FACTURA_ID` | Un registro por comprobante / factura de ingreso (CFDI de Ingreso 4.0). |
-| `FACT_GASTOS_LIQUIDACION` (proceso 6, "Gastos y Liquidación Viaje") | Fecha, Vehículo, Remolque, Operador | `NUMERO_TALON`, `FOLIO_LIQ` | Un registro por concepto liquidado de un viaje (casetas, operador, mantenimiento u otros gastos). |
+| `FACT_FACTURACION_FLETE` (proceso 5, "Facturación Comercial Flete") | Fecha, Vehículo, Operador, Cliente, Ubicación (rol Destino) | `UUID_INGRESO`, `FACTURA_ID` | 1 fila por viaje/concepto facturado en CFDI de Ingreso 4.0 (`UUID_INGRESO`, `FACTURA_ID`). |
+| `FACT_GASTOS_LIQUIDACION` (proceso 6, "Gastos y Liquidación Viaje") | Fecha, Vehículo, Remolque, Operador | `NUMERO_TALON`, `FOLIO_LIQ` | 1 fila por concepto de gasto/liquidación de viaje (`NUMERO_TALON`, `FOLIO_LIQ`, clasificado en `CASETA`, `OPERADOR`, `MANTENIMIENTO`, `OTROS`). |
 
 Nota: el docx §3 y §8 marcan `FACT_FACTURACION_FLETE` como fuente requerida aún no disponible en los datos reales; se cubre con datos simulados (ver `tms-synthetic-data-sim`).
