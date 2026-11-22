@@ -1,0 +1,26 @@
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Python
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Volúmenes de datos locales
+oracle_data/
+postgres_data/
+valkey_data/
+
+# Logs y temporales
+*.log
+.bob/tmp/
+*.dmp
+*.dump

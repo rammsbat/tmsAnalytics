@@ -1,0 +1,45 @@
+# Esquema de referencia para simulator/config_rules.yaml
+# Fuente: .bob/skills/tms-synthetic-data-sim/SKILL.md, paso 1.
+# Los valores son ejemplos iniciales; calibrar en la Fase 3. No incluir secretos.
+
+# Semilla determinista para pruebas reproducibles.
+seed: 42
+
+# Tamaño de la flota (decisión de la spec: 100 unidades, ECO01..ECO100).
+# Nota: el Draft Dashboard (docs/Draft-dashboard-TMS.pdf) muestra una muestra de 9 unidades
+# (5 con viaje = 56%, 4 sin viaje = 44%, 0 inactivas). Los porcentajes son del Draft;
+# fleet_size: 100 es decisión de la spec, no del Draft.
+fleet_size: 100
+fleet_status_mix:
+  with_trip: 0.56
+  without_trip: 0.40
+  inactive: 0.04
+
+# Rango del backfill.
+date_range_backfill:
+  days: 90
+  # Preset opcional para replicar el Draft Dashboard (periodo 01/11/2026 - 06/11/2026).
+  preset_draft:
+    start: "2026-11-01"
+    end: "2026-11-06"
+
+# Modelo de precios para CFDI de Ingreso 4.0 (tarifa base + tarifa/km + recargos).
+pricing_model:
+  base_rate: 0.0          # TODO calibrar en Fase 3
+  rate_per_km: 0.0        # TODO calibrar en Fase 3
+  surcharges: []          # TODO calibrar en Fase 3
+  currency: "MXN"
+
+# Modelo de costos: peajes IAVE, pago a operador y mantenimiento.
+cost_model:
+  tolls_iave: {}          # TODO calibrar en Fase 3
+  operator_pay:
+    per_km: 0.0           # TODO calibrar en Fase 3
+    per_trip: 0.0         # TODO calibrar en Fase 3
+  maintenance: {}         # TODO calibrar en Fase 3
+
+# Restricciones físicas (docx §2.1 y spec §4.2).
+constraints:
+  max_gross_weight_kg: 29685   # tractor C3R2 con remolque
+  stops_per_trip: [4, 12]
+  energy_efficiency_km_per_kwh: [2.0, 11.6]
