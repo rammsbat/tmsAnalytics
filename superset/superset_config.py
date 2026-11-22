@@ -1,3 +1,10 @@
+
+# -----------------------------------------------------------------------------
+# Oracle Thin Mode Driver Compatibility (SQLAlchemy 1.4 + python-oracledb)
+# -----------------------------------------------------------------------------
+import sys, oracledb
+oracledb.version = "8.3.0"
+sys.modules["cx_Oracle"] = oracledb
 # superset_config.py - Configuracion Analitica Base para Analytics TMS
 # Formato: saltos de linea LF. Cero secretos en codigo (Regla 03).
 

@@ -51,7 +51,7 @@ with app.app_context():
         sys.exit(0)
     
     escaped_pwd = urllib.parse.quote_plus(bi_reader_pwd)
-    uri = f"oracle+oracledb://BI_READER:{escaped_pwd}@oracle-dw:1521/?service_name=FREEPDB1"
+    uri = f"oracle+cx_oracle://BI_READER:{escaped_pwd}@oracle-dw:1521/?service_name=FREEPDB1"
     
     db_obj = db.session.query(Database).filter_by(database_name=db_name).first()
     if not db_obj:
