@@ -182,7 +182,17 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `oracle/ddl/02_ddl_stg_src.sql` (`STG_FLOTA_UNIDADES`, auditoría), `.bob/skills/tms-synthetic-data-sim/templates/sim_rules_schema.yaml`, `.bob/rules/03-security-and-secrets.md` §2 y §3. Modo: `data-sim-eng`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-3)
+
+**Resultado ST-2 (verificado):**
+- `simulator/config_rules.yaml` calibrado (sin `TODO`; ECO01: 1,000.00 + 595 km × 147.50 + 325.50 = $89,088.00) y validado por `src/config.py`.
+- `src/contract.py` parsea `oracle/ddl/02_ddl_stg_src.sql` (8 tablas) y valida tipo, longitud en **bytes UTF-8**, `NUMBER(p,s)`, nulabilidad, columnas exactas y cadenas vacías; el DDL se copia a la imagen en `/app/contract/`.
+- `src/generators/fleet_master.py`: `ECO01..ECO100`, `CAJA01..CAJA100`, 15 operadores, 6 clientes, 8 ubicaciones (`IMESA`, `SMO`, `MERCURIO`…), 10 pólizas; RNG por *stream* (`sha256(seed:stream)`), sin `datetime.now()` ni `uuid4()` (verificado por prueba AST).
+- `src/db_loader.py`: Thin, solo `SIM_WRITER`, `executemany` en lotes de 5,000, binds posicionales, `commit` único (todo o nada), solo `INSERT`/`SELECT`.
+- `BATCH_ID = SIM-<MODO>-<AAAAMMDD>-s<seed>-<NNN>`; `INGESTED_AT` = `end_date` 00:00 + NNN minutos (determinista, creciente por corrida; D7).
+- `pytest`: 41 pruebas en verde dentro de la imagen. `--dry-run`: mismo `fingerprint` en dos corridas; distinto con `--seed 7`.
+- Carga real: `STG_FLOTA_UNIDADES` 0 → 100 filas (`SIM-BACKFILL-20261106-s42-001`, `FLOTA`), 100 ECO / placas / VIN / motores distintos, 0 nulos de auditoría. 2.ª corrida asignó `-002` automáticamente; se eliminó con `ETL_RUNNER` (`SIM_WRITER` no puede `DELETE`).
+- Nota de contenedor: `./simulator` **no** está montado como volumen; la imagen se reconstruye (`docker compose --profile sim build data-simulator`) tras cada cambio de código.
 
 ---
 
