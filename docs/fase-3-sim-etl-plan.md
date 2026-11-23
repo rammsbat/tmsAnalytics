@@ -247,7 +247,16 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `02_ddl_stg_src.sql` tablas 7 y 8, `04_ddl_dwh_mart.sql` (`FACT_FACTURACION_FLETE`, `FACT_GASTOS_LIQUIDACION`), `.bob/rules-dw-architect-oracle/01-oracle-ddl-conventions.md` §4.2. Modo: `data-sim-eng`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-5)
+
+**Resultado ST-4 (verificado):**
+- Módulo nuevo: `generators/finance_erp.py` implementa `build_cfdi_ingreso` (CFDI Ingreso 4.0 con cuadre fiscal exacto a 2 decimales usando `Decimal` `ROUND_HALF_UP`: `IMPORTE_TOTAL = SUBTOTAL - DESCUENTO + IVA_TRASLADADO - IVA_RETENIDO` con 16 % IVA y 4 % retención flete, moneda `MXN`, `UUID_INGRESO` determinista desde RNG sembrado) y `build_liquidaciones_gastos` (H5: `FOLIO_LIQUIDACION` único por viaje cerrado con 2–4 líneas `CASETA`, 1 `OPERADOR`, y líneas opcionales `MANTENIMIENTO` y `OTROS`, sin emitir `COMBUSTIBLE_ENERGIA`).
+- Integración en `scenario.py` y `main.py`: facturación y liquidación exclusivas para viajes `CERRADO` (A4); en backfill los 11 viajes abiertos al corte no se facturan ni liquidan hasta cerrarse en `--mode incremental` (11 talones cerrados facturados y liquidados sin duplicar).
+- Orden de emisión y carga: maestros → operación TrackIt → Carta Porte → estatus flota → finanzas (`STG_CFDI_INGRESO` y `STG_LIQUIDACIONES_GASTOS`). Margen operativo fuertemente positivo (> 85 % global, individual > 0).
+- Suite `pytest`: **75 pruebas en verde** (+8 pruebas nuevas en `test_finance_erp.py` cubriendo contrato DDL, viajes cerrados, incremental sin duplicación, cuadre fiscal al centavo, calibración ECO01 $89,088.00, granularidad de liquidación, margen operativo y determinismo).
+- `--dry-run` backfill 90 días: `STG_FLOTA_UNIDADES` 100 (+1 +1 SCD2), `STG_TRACKIT_DESPACHO` 5,040, `STG_TRACKIT_PARADAS` 40,458, `STG_CARTA_PORTE_CABECERA` 5,040, `STG_CARTA_PORTE_MERCANCIAS` 15,236, `STG_FLOTA_ESTATUS_DIARIO` 9,000, `STG_CFDI_INGRESO` 5,029 (5,040 - 11 abiertos), `STG_LIQUIDACIONES_GASTOS` 22,511.
+- `--dry-run` incremental `--trips 5`: 16 despachos (11 cierres + 5 nuevos), 14 CFDIs emitidos (11 de los viajes cerrados anteriores + 3 de los nuevos cerrados), 67 líneas de liquidación.
+- Carga real de prueba ejecutada con `SIM_WRITER` (102,416 filas insertadas y verificadas contra Oracle en corrida atómica) y posteriormente eliminada con `ETL_RUNNER` (`STG_SRC` queda 100 % limpio con 0 filas para ST-5).
 
 ---
 
