@@ -9,7 +9,7 @@ description: Construye y prueba modelos dbt-oracle para transformar datos desde 
 - Usar `checklists/kimball_quality_screens.md` como lista de verificación de los Data Quality Screens.
 
 ## Pasos de Ejecución
-1. Configurar `etl/dbt_tms/dbt_project.yml` y `etl/dbt_tms/profiles.template.yml` usando `type: oracle`, `protocol: thin` y variables de entorno (`env_var`).
+1. Configurar `etl/dbt_tms/dbt_project.yml` y `etl/dbt_tms/profiles.template.yml` usando `type: oracle`, `protocol: tcp` (modo Thin; `thin` no es un valor válido: `DPY-4021`) con `host`/`port`/`service` y variables de entorno (`env_var`).
 2. Construir modelos `staging/` (limpieza de nulos, trim de textos, normalización de fechas/RFCs).
 3. Construir modelos `edw_3fn/` (deduplicación incremental por `MERGE` usando llaves naturales).
 4. Construir modelos `marts/dimensions/`:
