@@ -1,0 +1,165 @@
+version: 2
+
+# ST-7: tests de la capa EDW_3FN. Los modelos usan alias = tabla destino preexistente (merge_existing).
+# Llaves naturales unicas, FKs NOT NULL donde el DDL lo exige y relationships hacia los catalogos.
+models:
+  - name: sat_unidad_medida
+    columns:
+      - name: CLAVE_UNIDAD_SAT
+        data_tests: [not_null, unique]
+  - name: sat_producto_servicio
+    columns:
+      - name: CLAVE_PRODUCTO_SAT
+        data_tests: [not_null, unique]
+      - name: CLAVE_UNIDAD_DEFECTO
+        data_tests:
+          - relationships:
+              arguments: {to: ref('sat_unidad_medida'), field: CLAVE_UNIDAD_SAT}
+  - name: sat_config_autotransporte
+    columns:
+      - name: CLAVE_CONFIG_SAT
+        data_tests: [not_null, unique]
+  - name: sat_tipo_permiso
+    columns:
+      - name: CLAVE_TIPO_PERMISO
+        data_tests: [not_null, unique]
+
+  - name: cat_polizas_seguro
+    columns:
+      - name: ID_POLIZA
+        data_tests: [not_null, unique]
+      - name: NUMERO_POLIZA
+        data_tests: [not_null, unique]
+  - name: cat_clientes
+    columns:
+      - name: ID_CLIENTE
+        data_tests: [not_null, unique]
+      - name: RFC_CLIENTE
+        data_tests: [not_null, unique]
+      - name: RAZON_SOCIAL
+        data_tests: [not_null, unique]   # resolucion del cliente de TrackIt por nombre (1:1 con RFC)
+  - name: cat_operadores
+    columns:
+      - name: ID_OPERADOR
+        data_tests: [not_null, unique]
+      - name: CODIGO_OPERADOR
+        data_tests: [not_null, unique]
+  - name: cat_ubicaciones
+    columns:
+      - name: ID_UBICACION
+        data_tests: [not_null, unique]
+      - name: CODIGO_UBICACION
+        data_tests: [not_null, unique]
+      - name: CODIGO_POSTAL
+        data_tests: [not_null]   # ubicaciones sin geografia (CP '00000'): ver tests/edw_3fn_ubicaciones_sin_geografia.sql
+  - name: cat_remolques
+    columns:
+      - name: ID_REMOLQUE
+        data_tests: [not_null, unique]
+      - name: NUMERO_ECONOMICO_REMOLQUE
+        data_tests: [not_null, unique]
+  - name: cat_vehiculos
+    columns:
+      - name: ID_VEHICULO
+        data_tests: [not_null, unique]
+      - name: CODIGO_ECO
+        data_tests: [not_null, unique]
+      - name: CONFIGURACION_SAT
+        data_tests:
+          - relationships:
+              arguments: {to: ref('sat_config_autotransporte'), field: CLAVE_CONFIG_SAT}
+      - name: TIPO_PERMISO_SCT
+        data_tests:
+          - relationships:
+              arguments: {to: ref('sat_tipo_permiso'), field: CLAVE_TIPO_PERMISO}
+      - name: ID_POLIZA_SEGURO
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('cat_polizas_seguro'), field: ID_POLIZA}
+
+  - name: op_viajes_despacho
+    columns:
+      - name: ID_VIAJE
+        data_tests: [not_null, unique]
+      - name: NUMERO_TALON
+        data_tests: [not_null, unique]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_vehiculos')", field: ID_VEHICULO}}}]
+      - name: ID_REMOLQUE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_remolques')", field: ID_REMOLQUE}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_operadores')", field: ID_OPERADOR}}}]
+      - name: ID_CLIENTE_ORIGEN
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_clientes')", field: ID_CLIENTE}}}]
+      - name: ID_CLIENTE_DESTINO
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_clientes')", field: ID_CLIENTE}}}]
+  - name: op_viajes_paradas
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [ID_VIAJE, NUMERO_SECUENCIA]}
+    columns:
+      - name: ID_VIAJE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('op_viajes_despacho')", field: ID_VIAJE}}}]
+      - name: ID_UBICACION
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_ubicaciones')", field: ID_UBICACION}}}]
+  - name: op_flota_estatus_diario
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [ID_VEHICULO, FECHA_CORTE]}
+    columns:
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_vehiculos')", field: ID_VEHICULO}}}]
+      - name: ID_VIAJE
+        data_tests: [{relationships: {arguments: {to: "ref('op_viajes_despacho')", field: ID_VIAJE}}}]
+
+  - name: fiscal_cfdi_cartaporte
+    columns:
+      - name: UUID_CCP
+        data_tests: [not_null, unique]
+      - name: ID_VIAJE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('op_viajes_despacho')", field: ID_VIAJE}}}]
+      - name: ID_CLIENTE_REMITENTE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_clientes')", field: ID_CLIENTE}}}]
+      - name: ID_CLIENTE_DESTINATARIO
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_clientes')", field: ID_CLIENTE}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_vehiculos')", field: ID_VEHICULO}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_operadores')", field: ID_OPERADOR}}}]
+      - name: ID_ORIGEN_UBICACION
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_ubicaciones')", field: ID_UBICACION}}}]
+      - name: ID_DESTINO_UBICACION
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_ubicaciones')", field: ID_UBICACION}}}]
+  - name: fiscal_cartaporte_mercancias
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [ID_CFDI_CCP, NUMERO_PARTIDA]}
+    columns:
+      - name: ID_CFDI_CCP
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('fiscal_cfdi_cartaporte')", field: ID_CFDI_CCP}}}]
+      - name: CLAVE_PRODUCTO_SAT
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('sat_producto_servicio')", field: CLAVE_PRODUCTO_SAT}}}]
+      - name: CLAVE_UNIDAD_SAT
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('sat_unidad_medida')", field: CLAVE_UNIDAD_SAT}}}]
+  - name: fiscal_cfdi_ingreso
+    columns:
+      - name: UUID_INGRESO
+        data_tests: [not_null, unique]
+      - name: ID_VIAJE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('op_viajes_despacho')", field: ID_VIAJE}}}]
+      - name: ID_CLIENTE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_clientes')", field: ID_CLIENTE}}}]
+  - name: op_liquidaciones_gastos
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [FOLIO_LIQUIDACION, TIPO_GASTO, REFERENCIA_COMPROBANTE]}
+    columns:
+      - name: ID_VIAJE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('op_viajes_despacho')", field: ID_VIAJE}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_vehiculos')", field: ID_VEHICULO}}}]
+      - name: ID_REMOLQUE
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_remolques')", field: ID_REMOLQUE}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: "ref('cat_operadores')", field: ID_OPERADOR}}}]

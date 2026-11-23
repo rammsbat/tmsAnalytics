@@ -8,12 +8,17 @@
   Config:
     unique_key           (obligatorio) columna o lista de columnas de la clausula ON.
     merge_exclude_columns (opcional)   columnas del destino que el UPDATE no debe tocar.
+    protect_column       (opcional)   columna numerica cuyo valor -1 identifica la fila dummy
+                         y que el UPDATE nunca debe tocar. Por defecto, la primera columna
+                         IDENTITY del destino; si la tabla no tiene IDENTITY ni se configura,
+                         NO se emite predicado de proteccion (nunca un `where` vacio).
+                         Usar en tablas con PK natural (DIM_FECHA: ID_FECHA, DIM_HORA: ID_HORA).
 
   Reglas (P2):
     * INSERT: solo columnas presentes en el modelo y en el destino; las IDENTITY se omiten.
     * UPDATE SET: excluye columnas del ON (evita ORA-38104), columnas IDENTITY y CREATED_AT.
       Si el modelo no aporta UPDATED_AT y el destino la tiene, se fija en SYSTIMESTAMP.
-    * Fila dummy -1: el UPDATE se protege con `<columna IDENTITY> <> -1`.
+    * Fila dummy -1: el UPDATE se protege con `<protect_column> <> -1` cuando aplica.
     * Nunca hace DROP/CREATE: `--full-refresh` no tiene efecto.
 -#}
 
@@ -85,7 +90,7 @@
 {%- endmacro %}
 
 {#- Construye el MERGE (P2). Se separa de la materializacion para poder inspeccionarlo. -#}
-{% macro build_merge_existing_sql(target_relation, select_sql, on_cols, src_cols, target_cols, identity_cols, exclude_cols) -%}
+{% macro build_merge_existing_sql(target_relation, select_sql, on_cols, src_cols, target_cols, identity_cols, exclude_cols, protect_col=none) -%}
     {%- set insert_cols = [] -%}
     {%- for c in target_cols -%}
         {%- if c in src_cols and c not in identity_cols -%}
@@ -115,8 +120,8 @@
         {%- if touch_updated_at %}
         t.UPDATED_AT = systimestamp
         {%- endif %}
-        {%- if identity_cols | length > 0 %}
-        where t.{{ identity_cols[0] }} <> -1
+        {%- if protect_col %}
+        where t.{{ protect_col }} <> -1
         {%- endif %}
     {% endif -%}
     when not matched then insert (
@@ -157,7 +162,20 @@
         {%- endif -%}
     {%- endfor -%}
 
-    {%- set merge_sql = build_merge_existing_sql(target_relation, sql, on_cols, src_cols, target_cols, identity_cols, exclude_cols) -%}
+    {#- Columna de proteccion de la fila -1: configurada, o la primera IDENTITY; sin ninguna => sin predicado. -#}
+    {%- set configured_protect = config.get('protect_column') -%}
+    {%- if configured_protect -%}
+        {%- set protect_col = configured_protect | upper -%}
+        {%- if protect_col not in target_cols -%}
+            {{ exceptions.raise_compiler_error("merge_existing: protect_column " ~ protect_col ~ " no existe en " ~ this) }}
+        {%- endif -%}
+    {%- elif identity_cols | length > 0 -%}
+        {%- set protect_col = identity_cols[0] -%}
+    {%- else -%}
+        {%- set protect_col = none -%}
+    {%- endif -%}
+
+    {%- set merge_sql = build_merge_existing_sql(target_relation, sql, on_cols, src_cols, target_cols, identity_cols, exclude_cols, protect_col) -%}
 
     {% call statement('main') -%}
         {{ merge_sql }}

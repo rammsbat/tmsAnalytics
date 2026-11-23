@@ -1,0 +1,50 @@
+version: 2
+
+# ST-7 (H6, R4): catalogos de referencia. Se materializan en el esquema propio de ETL_RUNNER y
+# luego los modelos edw_3fn los llevan por MERGE a EDW_3FN. Claves y codigos postales como
+# texto: dbt inferiria NUMBER y perderia ceros a la izquierda / el tipo VARCHAR2.
+# Fuente de verdad de los SAT: simulator/config_rules.yaml -> sat_catalogs (1 a 1).
+seeds:
+  - name: seed_sat_unidad_medida
+    description: Unidades de medida SAT emitidas por el simulador (catalogo cerrado).
+    config:
+      column_types:
+        clave_unidad_sat: varchar2(10)
+        nombre_unidad: varchar2(100)
+        descripcion: varchar2(250)
+        simbolo: varchar2(20)
+  - name: seed_sat_producto_servicio
+    description: Claves de producto/servicio SAT (c_ClaveProdServCP) emitidas por el simulador.
+    config:
+      column_types:
+        clave_producto_sat: varchar2(20)
+        descripcion_producto: varchar2(250)
+        material_peligroso_flag: varchar2(5)
+        clave_unidad_defecto: varchar2(10)
+  - name: seed_sat_config_autotransporte
+    description: Configuraciones vehiculares SAT (c_ConfigAutotransporte).
+    config:
+      column_types:
+        clave_config_sat: varchar2(20)
+        descripcion_config: varchar2(150)
+        numero_ejes: number(2)
+        numero_llantas: number(3)
+        remolque_permitido_flag: varchar2(1)
+  - name: seed_sat_tipo_permiso
+    description: Tipos de permiso SCT (c_TipoPermiso).
+    config:
+      column_types:
+        clave_tipo_permiso: varchar2(20)
+        descripcion_permiso: varchar2(150)
+  - name: seed_geo_ubicaciones
+    description: Geografia de las ubicaciones conocidas (CP, estado, municipio, lat/long); STG_SRC no la trae (H6).
+    config:
+      column_types:
+        codigo_ubicacion: varchar2(30)
+        nombre_ubicacion: varchar2(100)
+        codigo_postal: varchar2(10)
+        estado: varchar2(50)
+        municipio: varchar2(100)
+        latitud: number(10,6)
+        longitud: number(10,6)
+        tipo_ubicacion: varchar2(30)

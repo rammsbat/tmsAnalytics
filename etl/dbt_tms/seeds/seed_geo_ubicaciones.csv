@@ -1,0 +1,9 @@
+codigo_ubicacion,nombre_ubicacion,codigo_postal,estado,municipio,latitud,longitud,tipo_ubicacion
+IMESA,IMESA Planta Apaseo,38160,Guanajuato,Apaseo el Grande,20.5489,-100.6881,PLANTA_CEDIS
+SMO,SMO Centro de Distribucion,54713,Mexico,Cuautitlan Izcalli,19.6485,-99.2171,PLANTA_CEDIS
+MERCURIO,Mercurio CEDIS Guadalajara,45010,Jalisco,Zapopan,20.7214,-103.3910,PLANTA_CEDIS
+CEDIS_QRO,CEDIS Queretaro,76246,Queretaro,El Marques,20.5881,-100.2800,PLANTA_CEDIS
+CEDIS_MTY,CEDIS Monterrey,66600,Nuevo Leon,Apodaca,25.7817,-100.1883,PLANTA_CEDIS
+CEDIS_PUE,CEDIS Puebla,72710,Puebla,Cuautlancingo,19.1010,-98.2600,PLANTA_CEDIS
+CEDIS_LEO,CEDIS Leon,37545,Guanajuato,Leon,21.1250,-101.6860,PLANTA_CEDIS
+CEDIS_VER,CEDIS Veracruz,91697,Veracruz,Veracruz,19.1738,-96.1342,PLANTA_CEDIS
