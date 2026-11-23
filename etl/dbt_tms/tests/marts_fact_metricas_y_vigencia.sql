@@ -33,7 +33,7 @@ snap_dia as (
     select ID_FECHA_CORTE,
            count(*) as FILAS,
            count(distinct ID_VEHICULO) as UNIDADES,
-           sum(case when UNIDAD_CON_VIAJE_INDICADOR + UNIDAD_SIN_VIAJE_INDICADOR + UNIDAD_INACTIVA_INDICADOR = 1 then 0 else 1 end) as IND_MAL,
+           sum(case when UNIDAD_CON_VIAJE_INDICADOR + UNIDAD_SIN_VIAJE_INDICADOR + UNIDAD_INACTIVA_INDICADOR = FLOTA_TOTAL_INDICADOR and FLOTA_TOTAL_INDICADOR = 1 then 0 else 1 end) as IND_MAL,
            sum(case when ESTATUS_UNIDAD = 'SIN_REPORTE' then 1 else 0 end) as SIN_REP
     from {{ ref('fact_snapshot_flota_diario') }}
     group by ID_FECHA_CORTE
