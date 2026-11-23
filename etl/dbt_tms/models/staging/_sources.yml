@@ -1,0 +1,221 @@
+version: 2
+
+# ST-6: contrato de lectura de STG_SRC (append-only, D7). Una llave natural puede tener
+# varias versiones (INGESTED_AT / BATCH_ID); la deduplicacion ocurre en los modelos stg_*.
+# No se declara `freshness`: INGESTED_AT es un reloj simulado determinista (D6), no hora real.
+sources:
+  - name: stg_src
+    description: >
+      Staging crudo de fuentes (TrackItWeb, Carta Porte, Flota, ERP Financiero) escrito por el
+      simulador con SIM_WRITER. Fuente append-only: los cambios posteriores llegan como nuevas
+      filas con mayor INGESTED_AT / BATCH_ID.
+    schema: STG_SRC
+    tables:
+      - name: stg_trackit_despacho
+        identifier: STG_TRACKIT_DESPACHO
+        description: Cabecera de viaje (despacho) de TrackItWeb. Grano de llave natural TALON_FOLIO; varias versiones por cierre de viaje.
+        columns:
+          - name: TALON_FOLIO
+            description: Folio de talon del viaje (llave natural).
+            data_tests: [not_null]
+          - name: CODIGO_ECO
+            description: Codigo economico de la unidad (ECO01..ECO100).
+            data_tests: [not_null]
+          - name: CODIGO_OPERADOR
+            data_tests: [not_null]
+          - name: ESTATUS_DESPACHO
+            description: Estatus del viaje (EN_TRANSITO, CERRADO).
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["EN_TRANSITO", "CERRADO"]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["TRACKITWEB"]
+
+      - name: stg_trackit_paradas
+        identifier: STG_TRACKIT_PARADAS
+        description: Bitacora de paradas e hitos por viaje. Llave natural (TALON_FOLIO, NUMERO_SECUENCIA).
+        columns:
+          - name: TALON_FOLIO
+            data_tests: [not_null]
+          - name: NUMERO_SECUENCIA
+            data_tests: [not_null]
+          - name: CODIGO_UBICACION
+            data_tests: [not_null]
+          - name: TIPO_EVENTO
+            description: INICIO VIAJE, RECOLECCION, CARGA, DESCARGA, FIN VIAJE.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["INICIO VIAJE", "RECOLECCION", "CARGA", "DESCARGA", "FIN VIAJE"]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["TRACKITWEB"]
+
+      - name: stg_carta_porte_cabecera
+        identifier: STG_CARTA_PORTE_CABECERA
+        description: Cabecera del CFDI de Traslado con Complemento Carta Porte. Llave natural UUID_CCP.
+        columns:
+          - name: UUID_CCP
+            description: UUID fiscal del comprobante (llave natural).
+            data_tests: [not_null]
+          - name: NUMERO_TALON
+            data_tests: [not_null]
+          - name: RFC_REMITENTE
+            data_tests: [not_null]
+          - name: RFC_DESTINATARIO
+            data_tests: [not_null]
+          - name: CODIGO_ECO
+            data_tests: [not_null]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["CARTA_PORTE"]
+
+      - name: stg_carta_porte_mercancias
+        identifier: STG_CARTA_PORTE_MERCANCIAS
+        description: Partidas de mercancia amparadas por la Carta Porte. Llave natural (UUID_CCP, NUMERO_PARTIDA).
+        columns:
+          - name: UUID_CCP
+            data_tests: [not_null]
+          - name: NUMERO_TALON
+            data_tests: [not_null]
+          - name: NUMERO_PARTIDA
+            data_tests: [not_null]
+          - name: CLAVE_PRODUCTO_SAT
+            data_tests: [not_null]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["CARTA_PORTE"]
+
+      - name: stg_flota_unidades
+        identifier: STG_FLOTA_UNIDADES
+        description: Maestro de unidades de flota. Llave natural CODIGO_ECO; los cambios de placa llegan como nueva version (evento SCD2).
+        columns:
+          - name: CODIGO_ECO
+            data_tests: [not_null]
+          - name: TIPO_UNIDAD
+            data_tests: [not_null]
+          - name: ESTATUS_INVENTARIO
+            data_tests: [not_null]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["FLOTA"]
+
+      - name: stg_flota_estatus_diario
+        identifier: STG_FLOTA_ESTATUS_DIARIO
+        description: Estatus diario de patio/ruta por unidad. Llave natural (CODIGO_ECO, FECHA_CORTE).
+        columns:
+          - name: FECHA_CORTE
+            data_tests: [not_null]
+          - name: CODIGO_ECO
+            data_tests: [not_null]
+          - name: ESTATUS_PATIO
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["DISPONIBLE_CON_VIAJE", "DISPONIBLE_SIN_VIAJE", "EN_MANTENIMIENTO", "INACTIVO"]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["FLOTA"]
+
+      - name: stg_cfdi_ingreso
+        identifier: STG_CFDI_INGRESO
+        description: CFDI de Ingreso 4.0 por flete (un CFDI por viaje cerrado, A4). Llave natural UUID_INGRESO.
+        columns:
+          - name: UUID_INGRESO
+            data_tests: [not_null]
+          - name: FACTURA_ID
+            data_tests: [not_null]
+          - name: NUMERO_TALON
+            data_tests: [not_null]
+          - name: RFC_EMISOR
+            data_tests: [not_null]
+          - name: RFC_RECEPTOR
+            data_tests: [not_null]
+          - name: IMPORTE_TOTAL
+            data_tests: [not_null]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["ERP_FINANCIERO"]
+
+      - name: stg_liquidaciones_gastos
+        identifier: STG_LIQUIDACIONES_GASTOS
+        description: >
+          Lineas atomicas de liquidacion de gastos (H5). Sin llave unica declarada; la llave natural de
+          linea es (FOLIO_LIQUIDACION, TIPO_GASTO, REFERENCIA_COMPROBANTE).
+        columns:
+          - name: FOLIO_LIQUIDACION
+            data_tests: [not_null]
+          - name: NUMERO_TALON
+            data_tests: [not_null]
+          - name: TIPO_GASTO
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["CASETA", "OPERADOR", "MANTENIMIENTO", "COMBUSTIBLE_ENERGIA", "OTROS"]
+          - name: IMPORTE_GASTO
+            data_tests: [not_null]
+          - name: BATCH_ID
+            data_tests: [not_null]
+          - name: INGESTED_AT
+            data_tests: [not_null]
+          - name: SOURCE_SYSTEM
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["ERP_FINANCIERO"]

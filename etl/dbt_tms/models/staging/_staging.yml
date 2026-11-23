@@ -1,0 +1,114 @@
+version: 2
+
+# ST-6: tests de columna sobre la capa staging (post-deduplicacion, D7).
+# not_null en llaves naturales; unique_combination garantiza una sola version por llave.
+models:
+  - name: stg_trackit_despacho
+    description: Ultima version por TALON_FOLIO de STG_TRACKIT_DESPACHO, limpia y tipada (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [TALON_FOLIO]
+    columns:
+      - name: TALON_FOLIO
+        data_tests: [not_null]
+      - name: CODIGO_ECO
+        data_tests: [not_null]
+      - name: CODIGO_OPERADOR
+        data_tests: [not_null]
+
+  - name: stg_trackit_paradas
+    description: Ultima version por (TALON_FOLIO, NUMERO_SECUENCIA) de STG_TRACKIT_PARADAS (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [TALON_FOLIO, NUMERO_SECUENCIA]
+    columns:
+      - name: TALON_FOLIO
+        data_tests: [not_null]
+      - name: NUMERO_SECUENCIA
+        data_tests: [not_null]
+      - name: CODIGO_UBICACION
+        data_tests: [not_null]
+
+  - name: stg_carta_porte_cabecera
+    description: Ultima version por UUID_CCP de STG_CARTA_PORTE_CABECERA, RFC normalizados (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [UUID_CCP]
+    columns:
+      - name: UUID_CCP
+        data_tests: [not_null]
+      - name: NUMERO_TALON
+        data_tests: [not_null]
+      - name: RFC_REMITENTE
+        data_tests: [not_null]
+      - name: RFC_DESTINATARIO
+        data_tests: [not_null]
+
+  - name: stg_carta_porte_mercancias
+    description: Ultima version por (UUID_CCP, NUMERO_PARTIDA) de STG_CARTA_PORTE_MERCANCIAS (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [UUID_CCP, NUMERO_PARTIDA]
+    columns:
+      - name: UUID_CCP
+        data_tests: [not_null]
+      - name: NUMERO_PARTIDA
+        data_tests: [not_null]
+      - name: CLAVE_PRODUCTO_SAT
+        data_tests: [not_null]
+
+  - name: stg_flota_unidades
+    description: Estado actual por CODIGO_ECO de STG_FLOTA_UNIDADES; FECHA_EFECTIVA = dia de la version vigente (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [CODIGO_ECO]
+    columns:
+      - name: CODIGO_ECO
+        data_tests: [not_null]
+      - name: FECHA_EFECTIVA
+        data_tests: [not_null]
+
+  - name: stg_flota_estatus_diario
+    description: Ultima version por (CODIGO_ECO, FECHA_CORTE) de STG_FLOTA_ESTATUS_DIARIO (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [CODIGO_ECO, FECHA_CORTE]
+    columns:
+      - name: CODIGO_ECO
+        data_tests: [not_null]
+      - name: FECHA_CORTE
+        data_tests: [not_null]
+
+  - name: stg_cfdi_ingreso
+    description: Ultima version por UUID_INGRESO de STG_CFDI_INGRESO, RFC normalizados (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [UUID_INGRESO]
+    columns:
+      - name: UUID_INGRESO
+        data_tests: [not_null]
+      - name: FACTURA_ID
+        data_tests: [not_null]
+      - name: NUMERO_TALON
+        data_tests: [not_null]
+
+  - name: stg_liquidaciones_gastos
+    description: Ultima version por linea (FOLIO_LIQUIDACION, TIPO_GASTO, REFERENCIA_COMPROBANTE) de STG_LIQUIDACIONES_GASTOS (ephemeral).
+    data_tests:
+      - unique_combination:
+          arguments:
+            combination_of_columns: [FOLIO_LIQUIDACION, TIPO_GASTO, REFERENCIA_COMPROBANTE]
+    columns:
+      - name: FOLIO_LIQUIDACION
+        data_tests: [not_null]
+      - name: TIPO_GASTO
+        data_tests: [not_null]
+      - name: REFERENCIA_COMPROBANTE
+        data_tests: [not_null]
