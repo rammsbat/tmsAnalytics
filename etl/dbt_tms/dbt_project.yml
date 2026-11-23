@@ -23,6 +23,14 @@ models:
       +materialized: merge_existing
     marts:
       +schema: DWH_MART
+      dimensions:
+        +materialized: merge_existing
+
+vars:
+  # ST-8: rango calendario de DIM_FECHA y vigencia inicial uniforme de DIM_VEHICULO (A5).
+  dim_fecha_inicio: "2026-01-01"
+  dim_fecha_fin: "2026-12-31"
+  dim_vehiculo_inicio_validez: "2026-08-09"
 
 seeds:
   tms_dbt:

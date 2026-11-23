@@ -1,0 +1,10 @@
+{#- ST-8: DIM_REMOLQUE (SCD1, MERGE por llave natural; SK IDENTITY). -#}
+{{ config(alias='DIM_REMOLQUE', unique_key='NUMERO_ECONOMICO_REMOLQUE') }}
+select
+    NUMERO_ECONOMICO_REMOLQUE   as NUMERO_ECONOMICO_REMOLQUE,
+    PLACA_REMOLQUE              as PLACA_REMOLQUE,
+    TIPO_REMOLQUE_SAT           as TIPO_REMOLQUE_SAT,
+    SUBTIPO_REMOLQUE            as SUBTIPO_REMOLQUE,
+    CAPACIDAD_CARGA_KG          as CAPACIDAD_CARGA_KG,
+    ESTATUS_ACTIVO              as ESTATUS_ACTIVO
+from {{ ref('cat_remolques') }}

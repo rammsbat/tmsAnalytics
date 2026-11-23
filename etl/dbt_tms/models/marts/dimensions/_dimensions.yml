@@ -1,0 +1,87 @@
+version: 2
+
+# ST-8: tests de las 10 dimensiones conformadas de DWH_MART (merge_existing / scd2_existing).
+# La fila -1 (DDL 04 §2) tambien cumple not_null/unique; se verifica aparte en tests/marts_dim_fila_menos_uno.sql.
+models:
+  - name: dim_fecha
+    columns:
+      - name: ID_FECHA
+        data_tests: [not_null, unique]
+      - name: FECHA
+        data_tests: [not_null, unique]
+      - name: ES_FIN_SEMANA_FLAG
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: ["0", "1"]}
+      - name: DIA_SEMANA
+        data_tests:
+          - accepted_values:
+              arguments: {values: [1, 2, 3, 4, 5, 6, 7]}
+  - name: dim_hora
+    columns:
+      - name: ID_HORA
+        data_tests: [not_null, unique]
+      - name: AM_PM
+        data_tests:
+          - accepted_values:
+              arguments: {values: ["AM", "PM", "NA"]}
+  - name: dim_vehiculo
+    columns:
+      - name: ID_VEHICULO
+        data_tests: [not_null, unique]
+      - name: CODIGO_ECO
+        data_tests: [not_null]
+      - name: VERSION_ACTIVA
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: ["0", "1"]}
+      - name: FECHA_INICIO_VALIDEZ
+        data_tests: [not_null]
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [CODIGO_ECO, FECHA_INICIO_VALIDEZ]}
+  - name: dim_remolque
+    columns:
+      - name: ID_REMOLQUE
+        data_tests: [not_null, unique]
+      - name: NUMERO_ECONOMICO_REMOLQUE
+        data_tests: [not_null, unique]
+  - name: dim_operador
+    columns:
+      - name: ID_OPERADOR
+        data_tests: [not_null, unique]
+      - name: CODIGO_OPERADOR
+        data_tests: [not_null, unique]
+  - name: dim_cliente
+    columns:
+      - name: ID_CLIENTE
+        data_tests: [not_null, unique]
+      - name: RFC_CLIENTE
+        data_tests: [not_null, unique]
+  - name: dim_ubicacion
+    columns:
+      - name: ID_UBICACION
+        data_tests: [not_null, unique]
+      - name: CODIGO_UBICACION
+        data_tests: [not_null, unique]
+  - name: dim_producto_sat
+    columns:
+      - name: ID_PRODUCTO_SAT
+        data_tests: [not_null, unique]
+      - name: CLAVE_PRODUCTO_SAT
+        data_tests: [not_null, unique]
+  - name: dim_poliza
+    columns:
+      - name: ID_POLIZA
+        data_tests: [not_null, unique]
+      - name: NUMERO_POLIZA
+        data_tests: [not_null, unique]
+  - name: dim_perfil_viaje
+    columns:
+      - name: ID_PERFIL_VIAJE
+        data_tests: [not_null, unique]
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [TIPO_COBRO_FLETE, TIPO_COBRO_CASETAS, PAGO_OPERADOR, ETAPA_VIAJE]}
