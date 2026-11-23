@@ -152,10 +152,15 @@ with app.app_context():
                     all_passed = False
 
         print("\n--- 7. Validación de Endpoints de Filtros Nativos (Select Options) ---")
+        # Los IDs de dataset no son portables entre entornos/re-importaciones: se resuelven
+        # a partir del chart del bloque correspondiente (B6, B7, B4) del dashboard.
+        def ds_id_of(prefix):
+            return next(s.datasource_id for s in slices if s.slice_name.startswith(prefix))
+
         filter_endpoints = [
-            {"name": "Filtro UNIDAD (ds_06)", "dataset_id": 6, "col": "UNIDAD", "min_rows": 90},
-            {"name": "Filtro NOMBRE_OPERADOR (ds_07)", "dataset_id": 7, "col": "NOMBRE_OPERADOR", "min_rows": 10},
-            {"name": "Filtro CLIENTE (ds_04)", "dataset_id": 4, "col": "CLIENTE", "min_rows": 5}
+            {"name": "Filtro UNIDAD (ds_06)", "dataset_id": ds_id_of("B6 -"), "col": "UNIDAD", "min_rows": 90},
+            {"name": "Filtro NOMBRE_OPERADOR (ds_07)", "dataset_id": ds_id_of("B7 -"), "col": "NOMBRE_OPERADOR", "min_rows": 10},
+            {"name": "Filtro CLIENTE (ds_04)", "dataset_id": ds_id_of("B4 -"), "col": "CLIENTE", "min_rows": 5}
         ]
         for fe in filter_endpoints:
             try:
