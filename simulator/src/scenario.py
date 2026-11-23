@@ -18,6 +18,11 @@ from dataclasses import dataclass, field
 
 from .config import ConfigError, status_counts
 from .generators.carta_porte import SOURCE_SYSTEM_CCP, build_documents
+from .generators.finance_erp import (
+    SOURCE_SYSTEM_FINANCE,
+    build_cfdi_ingreso,
+    build_liquidaciones_gastos,
+)
 from .generators.fleet_master import SOURCE_SYSTEM_FLOTA, FleetMaster, random_plate
 from .generators.fleet_status import ESTATUS_CON_VIAJE, home_yard, plan_day, status_row
 from .generators.trackit_ops import SOURCE_SYSTEM_TRACKIT, TripInput, generate_trip
@@ -124,14 +129,15 @@ def _simulate(cfg: dict, master: FleetMaster, state: State, days: list[dt.date],
     odo = initial_odometers(cfg, master)
     odo.update(state.odometers)
     operators = [o["CODIGO_OPERADOR"] for o in master.operators]
-    out = {k: [] for k in ("despacho", "paradas", "estatus", "cp_cab", "cp_merc")}
+    out = {k: [] for k in ("despacho", "paradas", "estatus", "cp_cab", "cp_merc", "cfdi", "liquidaciones")}
     first_day, last_day = days[0], days[-1]
 
     # 1) Cierre de viajes abiertos de corridas previas (nueva version, D7).
     closed_now = 0
     for ot in state.open_trips:
-        trip = generate_trip(cfg, master, TripInput(ot.talon, ot.talon_num, ot.eco, ot.operator_code,
-                                                    ot.day, ot.start_minute, ot.odometer_start, None))
+        ti = TripInput(ot.talon, ot.talon_num, ot.eco, ot.operator_code,
+                       ot.day, ot.start_minute, ot.odometer_start, None)
+        trip = generate_trip(cfg, master, ti)
         for r in (trip.despacho, *trip.paradas):
             r["_ING_DAY"] = first_day
         out["despacho"].append(trip.despacho)
@@ -139,6 +145,9 @@ def _simulate(cfg: dict, master: FleetMaster, state: State, days: list[dt.date],
         out["estatus"].append(status_row(ot.day, ot.eco, ESTATUS_CON_VIAJE, talon=ot.talon,
                                          yard=trip.destination, km=trip.km_total, kwh=trip.kwh,
                                          ing_day=first_day))
+        # ST-4: Viaje ahora CERRADO -> emite CFDI y liquidacion en esta corrida (A4)
+        out["cfdi"].append(build_cfdi_ingreso(cfg, master, ti, trip, ing_day=first_day))
+        out["liquidaciones"].extend(build_liquidaciones_gastos(cfg, master, ti, trip, ing_day=first_day))
         odo[ot.eco] = trip.odometer_end
         closed_now += 1
 
@@ -164,6 +173,9 @@ def _simulate(cfg: dict, master: FleetMaster, state: State, days: list[dt.date],
             out["cp_merc"].extend(merc)
             if trip.closed:
                 odo[eco] = trip.odometer_end
+                # ST-4: Solo viajes cerrados se facturan y liquidan (A4)
+                out["cfdi"].append(build_cfdi_ingreso(cfg, master, ti, trip, ing_day=day))
+                out["liquidaciones"].extend(build_liquidaciones_gastos(cfg, master, ti, trip, ing_day=day))
             else:
                 open_trips.append(OpenTrip(talon, tnum, eco, op, day, start, ti.odometer_start))
             day_status[eco] = status_row(day, eco, ESTATUS_CON_VIAJE, talon=talon,
@@ -191,6 +203,8 @@ def _ops_emissions(rows: dict[str, list[dict]]) -> list[Emission]:
         Emission("STG_CARTA_PORTE_CABECERA", SOURCE_SYSTEM_CCP, rows["cp_cab"]),
         Emission("STG_CARTA_PORTE_MERCANCIAS", SOURCE_SYSTEM_CCP, rows["cp_merc"]),
         Emission("STG_FLOTA_ESTATUS_DIARIO", SOURCE_SYSTEM_FLOTA, rows["estatus"]),
+        Emission("STG_CFDI_INGRESO", SOURCE_SYSTEM_FINANCE, rows["cfdi"]),
+        Emission("STG_LIQUIDACIONES_GASTOS", SOURCE_SYSTEM_FINANCE, rows["liquidaciones"]),
     ]
 
 

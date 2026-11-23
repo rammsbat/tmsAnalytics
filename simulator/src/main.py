@@ -4,8 +4,9 @@ Uso (dentro del contenedor):
   python -m src.main --mode backfill --days 90 [--dry-run]
   python -m src.main --mode incremental --trips 5 [--dry-run]
 
-ST-3 emite maestros, TrackIt (despacho/paradas), Carta Porte, estatus diario de patio y los
-eventos SCD2 de placa. Las tablas financieras (CFDI/liquidaciones) llegan en ST-4.
+ST-4 emite las 8 tablas de STG_SRC: maestros de flota, TrackIt (despacho/paradas), Carta Porte
+(cabecera/mercancias), estatus diario de flota, CFDI Ingreso 4.0 y liquidaciones de gastos,
+junto con los eventos SCD2 de placa.
 La corrida es atomica: un unico COMMIT al final; ante cualquier error se hace rollback total.
 """
 from __future__ import annotations

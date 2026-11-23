@@ -129,13 +129,16 @@ def test_cli_incremental_dry_run_matches_real_batch_numbering(capsys):
     assert "STG_FLOTA_ESTATUS_DIARIO: filas=111" in out and '"viajes_cerrados_ahora": 11' in out
 
 
-def test_cli_backfill_dry_run_emits_all_st3_tables(capsys):
+def test_cli_backfill_dry_run_emits_all_8_tables(capsys):
     assert main.main(["--mode", "backfill", "--days", "90", "--dry-run"]) == 0
     out = capsys.readouterr().out
-    for name, rows in (("STG_TRACKIT_DESPACHO", 5040), ("STG_TRACKIT_PARADAS", 40458),
+    for name, rows in (("STG_FLOTA_UNIDADES", 100),
+                       ("STG_TRACKIT_DESPACHO", 5040), ("STG_TRACKIT_PARADAS", 40458),
                        ("STG_CARTA_PORTE_CABECERA", 5040), ("STG_CARTA_PORTE_MERCANCIAS", 15236),
-                       ("STG_FLOTA_ESTATUS_DIARIO", 9000)):
+                       ("STG_FLOTA_ESTATUS_DIARIO", 9000),
+                       ("STG_CFDI_INGRESO", 5029)):
         assert f"{name}: filas={rows} " in out
+    assert "STG_LIQUIDACIONES_GASTOS: filas=" in out
     assert "batch_id=SIM-BACKFILL-20261106-s42-001-E01" in out and "batch_id=SIM-BACKFILL-20261106-s42-001-E02" in out
 
 
