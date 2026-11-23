@@ -312,7 +312,30 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `02_ddl_stg_src.sql`, `.bob/skills/dbt-oracle-etl-pipeline/SKILL.md` paso 2. Modos: `dw-architect-oracle` (modelos `.sql/.yml`) y `agent` (macros si el regex lo impide).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-7; sin commit aún)
+
+**Resultado ST-6 (verificado en `etl-runner`, dbt-core 1.12.7 / dbt-oracle 1.12.0, Thin):**
+- **Montaje temporal:** `etl-runner` no montaba el proyecto; se añadió `./etl/dbt_tms:/app/dbt_tms:ro` (solo lectura; no tapa `/app/profiles` ni `DBT_TARGET_PATH`/`DBT_LOG_PATH`). **Se retira en ST-11** para validar la imagen autocontenida.
+- **Fuentes** (`models/staging/_sources.yml`): las 8 tablas de `STG_SRC` con descripción y 69 tests de fuente (`not_null` en llaves naturales/auditoría, `accepted_values` en `SOURCE_SYSTEM`, `ESTATUS_DESPACHO`, `TIPO_EVENTO`, `ESTATUS_PATIO`, `TIPO_GASTO`). **No se declara `freshness`:** `INGESTED_AT` es un reloj simulado determinista (D6), por lo que medir frescura contra el reloj real sería un falso negativo permanente.
+- **Modelos `stg_*` (8, `ephemeral`; 0 objetos creados, `user_objects` de `ETL_RUNNER` = 0):** `TRIM`/`UPPER` en códigos, RFC en mayúsculas y sin ningún espacio (`regexp_replace(..., '\s', '')`), `COALESCE` de numéricos con el `DEFAULT` del DDL, fechas normalizadas, y deduplicación `ROW_NUMBER() OVER (PARTITION BY <llave natural> ORDER BY INGESTED_AT DESC, BATCH_ID DESC)`.
+  | Modelo | Llave natural de deduplicación | Filas STG → stg |
+  |---|---|---|
+  | `stg_trackit_despacho` | `TALON_FOLIO` | 5,040 → 5,040 |
+  | `stg_trackit_paradas` | `TALON_FOLIO, NUMERO_SECUENCIA` | 40,458 → 40,458 |
+  | `stg_carta_porte_cabecera` | `UUID_CCP` | 5,040 → 5,040 |
+  | `stg_carta_porte_mercancias` | `UUID_CCP, NUMERO_PARTIDA` | 15,236 → 15,236 |
+  | `stg_flota_unidades` | `CODIGO_ECO` | 102 → **100** (ECO07 y ECO42 conservan la placa vigente) |
+  | `stg_flota_estatus_diario` | `CODIGO_ECO, FECHA_CORTE` | 9,000 → 9,000 |
+  | `stg_cfdi_ingreso` | `UUID_INGRESO` | 5,029 → 5,029 |
+  | `stg_liquidaciones_gastos` | `FOLIO_LIQUIDACION, TIPO_GASTO, REFERENCIA_COMPROBANTE` | 22,511 → 22,511 |
+- **Decisión de llave en liquidaciones (H5):** la tabla no tiene UQ y varias casetas comparten `(folio, tipo)`; se verificó que `(folio, tipo, referencia_comprobante)` es única (22,511 distintas) y se usa como llave de línea. `stg_flota_unidades` expone además `FECHA_EFECTIVA = trunc(INGESTED_AT)` (versión vigente) para el SCD2 de ST-8: `ECO07` → 2026-10-01 y `ECO42` → 2026-10-20 (posteriores al inicio 2026-08-09, P3).
+- **Macros:** `merge_existing.sql` (P2: lee `ALL_TAB_IDENTITY_COLS`; `INSERT` sin columnas `IDENTITY`; `UPDATE SET` sin columnas del `ON`, sin `IDENTITY` y sin `CREATED_AT`; `UPDATED_AT = SYSTIMESTAMP` si el modelo no la aporta; `WHERE <identity> <> -1` protege la fila `-1`; valida que el `ON` exista y no sea `IDENTITY`; identificadores validados por regex), `scd2_existing.sql` (D4/P3: 1) `MERGE` de cierre con `FECHA_FIN_VALIDEZ = fecha_efectiva - 1`, `VERSION_ACTIVA='0'`, comparación NULL-safe con `DECODE` solo si la fecha efectiva es posterior al inicio de la versión activa; 2) `INSERT` de nueva versión activa solo si la llave no tiene versión activa; inicio = `initial_start_date` para llaves nuevas (A5) o fecha efectiva si ya tenía historia; fila `-1` intacta), `staging_helpers.sql` (`clean_text/clean_code/clean_rfc`). Test genérico `tests/generic/unique_combination.sql` (sin `dbt_utils`).
+- **Prueba funcional de las macros con modelos temporales (ya eliminados) y limpieza verificada:**
+  - `merge_existing` sobre `EDW_3FN.CAT_CLIENTES`: 1.ª corrida inserta (SK por `IDENTITY`), 2.ª entra por `WHEN MATCHED` y actualiza `RAZON_SOCIAL`/`UPDATED_AT` sin `ORA-38104`.
+  - `scd2_existing` sobre `DWH_MART.DIM_VEHICULO` (`ZZ_TEST01`): inserción inicial `2026-08-09` activa → cambio de placa con fecha efectiva `2026-10-01` cierra v1 en `2026-09-30` (`VERSION_ACTIVA='0'`) y abre v2 activa → reejecución idempotente (sigue 2 versiones) → cambio con fecha efectiva **anterior** (`2026-09-01`) ignorado (P3). Fila `-1` intacta.
+  - Limpieza: `DIM_VEHICULO`/`DIM_CLIENTE`/`DIM_FECHA`/`DIM_HORA` = 1 fila (`-1`), `FACT_DESPACHO_VIAJE` = 0; `EDW_3FN.CAT_CLIENTES`/`CAT_VEHICULOS`/`OP_VIAJES_DESPACHO` = 0; sin datos sucios en `EDW_3FN` ni `DWH_MART`.
+- **Verificación:** `dbt parse` OK; `dbt compile` OK (8 modelos, 100 tests); `dbt test --select source:stg_src` → **PASS=69/69**; `dbt test --select staging` → **PASS=100/100** (69 de fuente + 31 de modelo: `not_null` y `unique_combination`); `dbt run --select staging` no crea objetos (ephemeral).
+- **Observaciones:** (1) el aviso de rutas de configuración sin uso (`edw_3fn`, `marts`, `seeds`) desaparecerá al crear modelos/seeds en ST-7/ST-8. (2) `FECHA_EFECTIVA` en `stg_flota_unidades` depende de que `INGESTED_AT` del evento SCD2 sea el día efectivo (garantizado por el simulador, ST-3); para `ECO15@2026-11-07` se validará en ST-8 con `--mode incremental`.
 
 ---
 
