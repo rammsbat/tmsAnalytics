@@ -45,14 +45,21 @@ with app.app_context():
                 "extra_filters": [{"col": "UNIDAD", "op": "IN", "val": ["ECO01", "ECO02", "ECO15"]}]
             },
             {
-                "name": "4. Native Filter CLIENTE = 'PROCTER & GAMBLE MANUFACTURING MEXICO'",
+                "name": "4. Native Filter Multi-valor CLIENTE (3 Clientes)",
                 "time_range": "2026-11-01 : 2026-11-06",
-                "extra_filters": [{"col": "CLIENTE", "op": "IN", "val": ["PROCTER & GAMBLE MANUFACTURING MEXICO"]}]
+                "extra_filters": [{"col": "CLIENTE", "op": "IN", "val": [
+                    "PROCTER & GAMBLE MANUFACTURING MEXICO",
+                    "ALIMENTOS PROCESADOS DEL CENTRO",
+                    "ABARROTES Y CONSUMO NACIONAL"
+                ]}]
             },
             {
-                "name": "5. Native Filter OPERADOR = 'OP001 - MARÍA JOSÉ LILIANA MEDINA'",
+                "name": "5. Native Filter Multi-valor OPERADOR (2 Operadores)",
                 "time_range": "2026-11-01 : 2026-11-06",
-                "extra_filters": [{"col": "NOMBRE_OPERADOR", "op": "IN", "val": ["MARÍA JOSÉ LILIANA MEDINA"]}]
+                "extra_filters": [{"col": "NOMBRE_OPERADOR", "op": "IN", "val": [
+                    "MARÍA JOSÉ LILIANA MEDINA",
+                    "FABIOLA SANABRIA"
+                ]}]
             },
             {
                 "name": "6. Aislamiento Día 91 (2026-11-07)",

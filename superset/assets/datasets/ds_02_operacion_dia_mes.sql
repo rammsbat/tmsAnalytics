@@ -24,8 +24,8 @@ WITH CTE_DESPACHOS AS (
         ON d.ID_VEHICULO = v.ID_VEHICULO
     JOIN BI_SEMANTIC.VW_DIM_OPERADOR o 
         ON d.ID_OPERADOR = o.ID_OPERADOR
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON d.ID_CLIENTE_ORIGEN = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON d.ID_CLIENTE_ORIGEN = cli.ID_CLIENTE
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       {% if ecos %}
@@ -35,7 +35,7 @@ WITH CTE_DESPACHOS AS (
       AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
 ),
 CTE_LIQUIDACIONES AS (
@@ -71,15 +71,15 @@ CTE_CARTAPORTE AS (
         ON cp.ID_FECHA_EMISION = f.ID_FECHA
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON cp.ID_VEHICULO = v.ID_VEHICULO
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON cp.ID_CLIENTE_REMITENTE = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON cp.ID_CLIENTE_REMITENTE = cli.ID_CLIENTE
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
 ),
 CTE_FACTURACION AS (
@@ -92,15 +92,15 @@ CTE_FACTURACION AS (
         ON fac.ID_FECHA_FACTURACION = f.ID_FECHA
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON fac.ID_VEHICULO = v.ID_VEHICULO
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON fac.ID_CLIENTE = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON fac.ID_CLIENTE = cli.ID_CLIENTE
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
 )
 SELECT

@@ -12,23 +12,23 @@
 
 WITH CTE_CLIENTES AS (
     SELECT
-        c.RAZON_SOCIAL                                                                                         AS CLIENTE,
-        c.RFC_CLIENTE                                                                                          AS RFC,
+        cli.RAZON_SOCIAL                                                                                       AS CLIENTE,
+        cli.RFC_CLIENTE                                                                                        AS RFC,
         SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN d.CONTADOR_DESPACHO ELSE 0 END) AS DESPACHOS_DIA,
         SUM(d.CONTADOR_DESPACHO)                                                                               AS DESPACHOS_MES,
         SUM(d.KMS_TOTAL)                                                                                       AS KMS_MES
     FROM BI_SEMANTIC.VW_FACT_DESPACHO_VIAJE d
     JOIN BI_SEMANTIC.VW_DIM_FECHA f 
         ON d.ID_FECHA_INICIO = f.ID_FECHA
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON d.ID_CLIENTE_ORIGEN = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON d.ID_CLIENTE_ORIGEN = cli.ID_CLIENTE
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON d.ID_VEHICULO = v.ID_VEHICULO
     JOIN BI_SEMANTIC.VW_DIM_OPERADOR o 
         ON d.ID_OPERADOR = o.ID_OPERADOR
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
-      AND c.ID_CLIENTE <> -1
+      AND cli.ID_CLIENTE <> -1
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
@@ -36,11 +36,11 @@ WITH CTE_CLIENTES AS (
       AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
-        c.RAZON_SOCIAL,
-        c.RFC_CLIENTE
+        cli.RAZON_SOCIAL,
+        cli.RFC_CLIENTE
 )
 SELECT
     CLIENTE,

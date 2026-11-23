@@ -29,8 +29,8 @@ WITH CTE_DESPACHO AS (
         ON d.ID_OPERADOR = o.ID_OPERADOR
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON d.ID_VEHICULO = v.ID_VEHICULO
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON d.ID_CLIENTE_ORIGEN = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON d.ID_CLIENTE_ORIGEN = cli.ID_CLIENTE
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
@@ -41,7 +41,7 @@ WITH CTE_DESPACHO AS (
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         o.CODIGO_OPERADOR,
@@ -61,8 +61,8 @@ CTE_CARGA_CCP AS (
         ON cp.ID_OPERADOR = o.ID_OPERADOR
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON cp.ID_VEHICULO = v.ID_VEHICULO
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON cp.ID_CLIENTE_REMITENTE = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON cp.ID_CLIENTE_REMITENTE = cli.ID_CLIENTE
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
@@ -73,7 +73,7 @@ CTE_CARGA_CCP AS (
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         cp.UUID_CCP,
@@ -104,8 +104,8 @@ CTE_FACTURACION AS (
         ON fac.ID_OPERADOR = o.ID_OPERADOR
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON fac.ID_VEHICULO = v.ID_VEHICULO
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON fac.ID_CLIENTE = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON fac.ID_CLIENTE = cli.ID_CLIENTE
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
@@ -116,7 +116,7 @@ CTE_FACTURACION AS (
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         o.CODIGO_OPERADOR,

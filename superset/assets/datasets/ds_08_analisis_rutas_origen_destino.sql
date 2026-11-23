@@ -24,7 +24,7 @@ WITH CTE_CCP_RUTAS AS (
         dst.ESTADO_DESTINO                                     AS ESTADO_DESTINO,
         dst.LATITUD_DESTINO                                    AS LATITUD_DESTINO,
         dst.LONGITUD_DESTINO                                   AS LONGITUD_DESTINO,
-        c.RAZON_SOCIAL                                         AS CLIENTE,
+        cli.RAZON_SOCIAL                                       AS CLIENTE,
         v.CODIGO_ECO                                           AS UNIDAD,
         op.NOMBRE_OPERADOR                                     AS OPERADOR,
         MAX(cp.DISTANCIA_DECLARADA_KM)                         AS DISTANCIA_CCP,
@@ -36,8 +36,8 @@ WITH CTE_CCP_RUTAS AS (
         ON cp.ID_ORIGEN_UBICACION = o.ID_ORIGEN_UBICACION
     JOIN BI_SEMANTIC.VW_DIM_UBICACION_DESTINO dst 
         ON cp.ID_DESTINO_UBICACION = dst.ID_DESTINO_UBICACION
-    JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-        ON cp.ID_CLIENTE_REMITENTE = c.ID_CLIENTE
+    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+        ON cp.ID_CLIENTE_REMITENTE = cli.ID_CLIENTE
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON cp.ID_VEHICULO = v.ID_VEHICULO
     JOIN BI_SEMANTIC.VW_DIM_OPERADOR op 
@@ -53,7 +53,7 @@ WITH CTE_CCP_RUTAS AS (
       AND op.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
       {% if clientes %}
-      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         cp.UUID_CCP,
@@ -68,7 +68,7 @@ WITH CTE_CCP_RUTAS AS (
         dst.ESTADO_DESTINO,
         dst.LATITUD_DESTINO,
         dst.LONGITUD_DESTINO,
-        c.RAZON_SOCIAL,
+        cli.RAZON_SOCIAL,
         v.CODIGO_ECO,
         op.NOMBRE_OPERADOR
 )

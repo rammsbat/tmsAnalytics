@@ -18,9 +18,11 @@ El dashboard reproduce con total fidelidad la estructura visual, distribución y
 | Filtro | Tipo de Control | Dataset Target Principal | Parámetro Jinja / Columna | Configuración por Defecto |
 |---|---|---|---|---|
 | **Rango Temporal** | `filter_time` | Datasets 1 a 8 | `from_dttm`, `to_dttm` / `f.FECHA` | `2026-11-01 : 2026-11-06` (Corte cerrado backfill) |
-| **Unidad (ECO)** | `filter_select` (multi) | Datasets 1 a 8 (`UNIDAD`) | `v.CODIGO_ECO` (`filter_values('CODIGO_ECO') or filter_values('UNIDAD')`) | Todas las unidades activas |
-| **Operador** | `filter_select` (multi) | Datasets 2, 3, 4, 6, 7, 8 (`NOMBRE_OPERADOR`) | `o.NOMBRE_OPERADOR` (`filter_values('NOMBRE_OPERADOR') or filter_values('OPERADOR')`) | Todos los operadores |
-| **Cliente** | `filter_select` (multi) | Datasets 2 a 8 (`CLIENTE`) | `c.RAZON_SOCIAL` (`filter_values('RAZON_SOCIAL') or filter_values('CLIENTE')`) | Todos los clientes |
+| **Unidad (ECO)** | `filter_select` (multi) | Datasets 5 y 6 (`UNIDAD`) | `v.CODIGO_ECO` (`filter_values('CODIGO_ECO') or filter_values('UNIDAD')`) | Todas las unidades activas |
+| **Operador** | `filter_select` (multi) | Dataset 7 (`NOMBRE_OPERADOR`) | `o.NOMBRE_OPERADOR` (`filter_values('NOMBRE_OPERADOR') or filter_values('OPERADOR')`) | Todos los operadores |
+| **Cliente** | `filter_select` (multi) | Dataset 4 (`CLIENTE`) | `cli.RAZON_SOCIAL` (`filter_values('RAZON_SOCIAL') or filter_values('CLIENTE')`) | Todos los clientes |
+
+> **Nota de Modelado Kimball sobre Filtro de Cliente:** La tabla de hechos `FACT_GASTOS_LIQUIDACION` no posee clave foránea a cliente (los gastos de liquidación de casetas, operador y mantenimiento corresponden al viaje/unidad/operador y no están vinculados directamente a la entidad comercial cliente en el hecho). En cumplimiento estricto del principio de modelado Kimball que prohíbe uniones directas Fact↔Fact, las liquidaciones y gastos de operación no son filtrados por cliente a nivel de la CTE de gastos, manteniéndose a nivel de la flota y operador correspondientes.
 
 ---
 

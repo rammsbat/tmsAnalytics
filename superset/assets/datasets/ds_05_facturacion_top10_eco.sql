@@ -22,8 +22,8 @@ JOIN BI_SEMANTIC.VW_DIM_FECHA f
     ON fac.ID_FECHA_FACTURACION = f.ID_FECHA
 JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
     ON fac.ID_VEHICULO = v.ID_VEHICULO
-JOIN BI_SEMANTIC.VW_DIM_CLIENTE c 
-    ON fac.ID_CLIENTE = c.ID_CLIENTE
+JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
+    ON fac.ID_CLIENTE = cli.ID_CLIENTE
 WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
   AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
   AND v.ID_VEHICULO <> -1
@@ -31,7 +31,7 @@ WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
   AND v.CODIGO_ECO IN {{ ecos | where_in }}
   {% endif %}
   {% if clientes %}
-  AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
+  AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}
   {% endif %}
 GROUP BY
     v.CODIGO_ECO
