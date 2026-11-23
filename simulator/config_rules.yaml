@@ -1,0 +1,64 @@
+# Reglas de generacion del simulador TMS (Fase 3, ST-2).
+# Base: .bob/skills/tms-synthetic-data-sim/templates/sim_rules_schema.yaml
+# Sin secretos. Sin reloj: toda fecha parte de `end_date` y todo azar de `seed` (decision D6).
+
+# Semilla determinista y fecha ancla fija (dos corridas iguales => lotes identicos).
+seed: 42
+end_date: "2026-11-06"
+
+# Flota (decision de la spec: 100 unidades, ECO01..ECO100).
+fleet_size: 100
+fleet_status_mix:
+  with_trip: 0.56
+  without_trip: 0.40
+  inactive: 0.04
+
+# Rango del backfill (ultimos N dias hasta end_date inclusive).
+date_range_backfill:
+  days: 90
+  # Preset para replicar el periodo del Draft Dashboard (01/11/2026 - 06/11/2026).
+  preset_draft:
+    start: "2026-11-01"
+    end: "2026-11-06"
+
+# Maestros de flota (ST-2).
+fleet:
+  operators: 15              # el Draft reporta 15 operadores
+  trailers: 100              # CAJA01..CAJA100 (una caja por tractor; CAJA05 aparece en el Draft)
+  insurance_policies: 10     # polizas de flota: 10 unidades por poliza
+  payload_capacity_kg: 24000 # capacidad de carga util por unidad (< peso bruto max)
+  model_year_range: [2022, 2026]
+  policy_valid_days_range: [30, 400]   # vigencia restante de poliza respecto a end_date
+  inventory_status: "ACTIVO"           # estatus inicial de inventario (ST-3 puede re-emitir cambios)
+
+# Modelo de precios CFDI Ingreso 4.0: base + tarifa/km + recargos.
+# Calibracion con el Draft: ECO01 = $89,088.00 en 595 km
+#   1,000.00 + 595 * 147.50 + 325.50 (maniobras) = 89,088.00  (~ $149.73 por km)
+pricing_model:
+  base_rate: 1000.00
+  rate_per_km: 147.50
+  surcharges:
+    - { name: maniobras, kind: fixed, amount: 325.50, probability: 1.0 }
+    - { name: estadia,   kind: fixed, amount: 1200.00, probability: 0.15 }
+  currency: "MXN"
+  iva_rate: 0.16
+  iva_retention_rate: 0.04
+  invoice_lag_days: [0, 3]
+
+# Modelo de costos: casetas IAVE, pago al operador y mantenimiento.
+cost_model:
+  tolls_iave:
+    rate_per_km: 3.20
+    plazas_per_100km: 1.4
+  operator_pay:
+    per_km: 4.50
+    per_trip: 650.00
+  maintenance:
+    probability_per_trip: 0.02
+    amount_range: [800.00, 9000.00]
+
+# Restricciones fisicas (docx 2.1 y spec 4.2).
+constraints:
+  max_gross_weight_kg: 29685   # tractor C3R2 con remolque
+  stops_per_trip: [4, 12]
+  energy_efficiency_km_per_kwh: [2.0, 11.6]

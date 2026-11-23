@@ -15,6 +15,9 @@ RUN pip install -r /app/requirements.txt
 
 COPY --chown=appuser:appuser simulator/ /app/
 
+# Contrato de STG_SRC: el DDL versionado es la fuente de verdad (se parsea, no se copia a mano).
+COPY --chown=appuser:appuser oracle/ddl/02_ddl_stg_src.sql /app/contract/02_ddl_stg_src.sql
+
 USER appuser
 
 CMD ["python", "-m", "src.main", "--help"]
