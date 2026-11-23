@@ -276,7 +276,23 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `.bob/skills/tms-synthetic-data-sim/SKILL.md` paso 5; `AGENTS.md`. Modos: `data-sim-eng` (código/tests) y `agent` (ejecución en Docker).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (simulador completado, probado y backfill oficial cargado en `STG_SRC`)
+
+**Resultado ST-5 (verificado):**
+- **Imagen autocontenida:** Se retiraron los volúmenes temporales de desarrollo en `docker-compose.yml`. La imagen `analytics-tms-simulator:local` fue reconstruida con el contrato DDL horneado en `/contract/02_ddl_stg_src.sql`.
+- **Suite de pruebas:** **75 pruebas unitarias y de guardrails en verde** ejecutadas dentro de la imagen autocontenida (`test_cli_and_guardrails.py`, `test_contract.py`, `test_fleet_master.py`, `test_operations.py`, `test_finance_erp.py`). Cero llamadas a `now()`/`uuid4()`, cero SQL interpolado/f-strings, cero contraseñas literales, uso estricto de binds y Thin Mode de `python-oracledb`.
+- **Backfill oficial cargado y persistido en `STG_SRC`** (`SIM-BACKFILL-20261106-s42-001`, `seed=42`, `end_date=2026-11-06`, 90 días):
+  - `STG_FLOTA_UNIDADES`: **102** (100 unidades base + 2 eventos SCD2 dentro de ventana: `ECO07` y `ECO42`)
+  - `STG_TRACKIT_DESPACHO`: **5,040** (56 despachos/día × 90 días; 11 viajes abiertos al corte de las 18:00 del día 90)
+  - `STG_TRACKIT_PARADAS`: **40,458** (4 a 12 paradas por despacho)
+  - `STG_CARTA_PORTE_CABECERA`: **5,040** (1 documento por despacho)
+  - `STG_CARTA_PORTE_MERCANCIAS`: **15,236** (1 a 5 partidas por viaje, pesos unitarios y SAT cerrados)
+  - `STG_FLOTA_ESTATUS_DIARIO`: **9,000** (100 unidades/día × 90 días, mezcla exacta 56/40/3/1 %)
+  - `STG_CFDI_INGRESO`: **5,029** (exactamente 5,040 - 11 viajes abiertos)
+  - `STG_LIQUIDACIONES_GASTOS`: **22,511** (líneas atómicas de peaje IAVE, operador y mantenimiento para los 5,029 viajes cerrados)
+  - **Total filas en `STG_SRC`:** **102,416 filas** verificadas con `ETL_RUNNER` y `SIM_WRITER`.
+- **Soporte para prueba SCD2 en ST-8:**
+  - Configurado el evento `ECO15@2026-11-07` en `config_rules.yaml`. Durante el backfill se omite por estar fuera de ventana; al ejecutar `--mode incremental --trips N` (día 2026-11-07), el generador emite automáticamente la nueva placa en `STG_FLOTA_UNIDADES` con sufijo `-E01`, habilitando la validación del cierre de versión 1 y apertura de versión 2 en `DIM_VEHICULO`.
 
 ---
 
