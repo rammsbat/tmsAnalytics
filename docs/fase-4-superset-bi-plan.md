@@ -117,8 +117,8 @@ Pilares de la solución:
 3. Configurar filtros nativos y sus alcances (*filter scopes*).
 4. Redactar `superset/assets/dashboard_mapping.md` mapeando Chart ID, Dataset, Parámetros Jinja, Filtros y Métricas.
 
-**Relevant Context:** `docs/Draft-dashboard-TMS.pdf`, `.bob/skills/superset-oracle-drillacross/checklists/draft_dashboard_kpis.md`.  
-**Status:** `[ ] pending`
+**Relevant Context:** `docs/Draft-dashboard-TMS.pdf`, `.bob/skills/superset-oracle-drillacross/checklists/draft_dashboard_kpis.md`.
+**Status:** `[x] done` (Dashboard ID 1 'Reporte Diario de Operación — Analytics TMS' [TRA099R1] creado con 12 Charts [IDs 1..12], layout responsive organizado en 8 filas, 4 Native Filters configurados [Tiempo, Unidad, Operador, Cliente], matriz de mapeo en superset/assets/dashboard_mapping.md y 100% de escenarios de validación en vivo PASS contra Oracle DW en Thin Mode)
 
 ---
 
