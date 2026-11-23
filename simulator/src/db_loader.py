@@ -14,8 +14,9 @@ from typing import Iterable
 
 import oracledb
 
-from .batch import BatchInfo, batch_prefix, make_batch
-from .contract import ContractError, TableContract, validate_rows
+from .batch import batch_run_pattern
+from .contract import TableContract, validate_rows
+from .scenario import OpenTrip, State
 
 CHUNK_SIZE = 5000
 _IDENT_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -62,23 +63,33 @@ def _chunks(rows: list, size: int) -> Iterable[list]:
         yield rows[i:i + size]
 
 
-def next_run_seq(conn: oracledb.Connection, table: TableContract, mode: str, end_date, seed: int) -> int:
-    """Siguiente numero de corrida: 1 + corridas previas con el mismo prefijo de BATCH_ID.
+def next_run_seq(conn: oracledb.Connection, tables: Iterable[TableContract], mode: str, end_date,
+                 seed: int) -> int:
+    """Siguiente numero de corrida: 1 + el mayor NNN ya usado por lotes de corrida (no `-Exx`).
 
-    Solo SELECT con bind variable (el nombre de tabla proviene del contrato cerrado).
+    Un solo numero para TODA la corrida (todas las tablas comparten BATCH_ID base). Solo SELECT
+    con bind variable; los nombres de tabla provienen del contrato cerrado.
     """
-    if not _IDENT_RE.match(table.name):
-        raise LoaderError("Tabla invalida")
-    sql = ("SELECT COUNT(DISTINCT BATCH_ID) FROM STG_SRC." + table.name
-           + " WHERE BATCH_ID LIKE :prefix ESCAPE '\\'")
-    prefix = batch_prefix(mode, end_date, seed).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = batch_run_pattern(mode, end_date, seed)
+    highest = 0
     with conn.cursor() as cur:
-        cur.execute(sql, prefix=prefix + "%")
-        return int(cur.fetchone()[0]) + 1
+        for table in tables:
+            if not _IDENT_RE.match(table.name):
+                raise LoaderError("Tabla invalida")
+            sql = ("SELECT NVL(MAX(TO_NUMBER(REGEXP_SUBSTR(BATCH_ID, '[0-9]+$'))), 0) FROM STG_SRC."
+                   + table.name + " WHERE REGEXP_LIKE(BATCH_ID, :pattern)")
+            cur.execute(sql, pattern=pattern)
+            highest = max(highest, int(cur.fetchone()[0]))
+    return highest + 1
 
 
-def insert_rows(conn: oracledb.Connection, table: TableContract, rows: list[dict]) -> int:
-    """Valida contra el DDL e inserta por lotes; commit unico al final (todo o nada)."""
+def insert_rows(conn: oracledb.Connection, table: TableContract, rows: list[dict],
+                commit: bool = True) -> int:
+    """Valida contra el DDL e inserta por lotes.
+
+    `commit=True` (por defecto) confirma al final; el CLI usa `commit=False` en todas las tablas y
+    confirma UNA vez, de modo que una corrida es atomica entre tablas (todo o nada).
+    """
     validate_rows(table, rows)  # ContractError antes de tocar la BD
     sql = build_insert_sql(table)
     names = table.column_names
@@ -88,7 +99,8 @@ def insert_rows(conn: oracledb.Connection, table: TableContract, rows: list[dict
             for chunk in _chunks(rows, CHUNK_SIZE):
                 cur.executemany(sql, [tuple(r[c] for c in names) for r in chunk])
                 total += len(chunk)
-        conn.commit()
+        if commit:
+            conn.commit()
     except oracledb.Error as exc:
         conn.rollback()
         code = getattr(exc.args[0], "code", None) if exc.args else None
@@ -101,3 +113,38 @@ def count_batch(conn: oracledb.Connection, table: TableContract, batch_id: str) 
     with conn.cursor() as cur:
         cur.execute(sql, batch_id=batch_id)
         return int(cur.fetchone()[0])
+
+
+def _talon_num(prefix: str, talon: str) -> int:
+    return int(talon[len(prefix):])
+
+
+def load_state(conn: oracledb.Connection, cfg: dict) -> State:
+    """Estado de lo ya cargado para el modo incremental (solo SELECT con binds)."""
+    prefix = cfg["numbering"]["talon_prefix"]
+    pattern = "^" + prefix + "[0-9]+$"
+    with conn.cursor() as cur:
+        cur.execute("SELECT MIN(TRUNC(FECHA_DESPACHO)), MAX(TRUNC(FECHA_DESPACHO)), "
+                    "NVL(MAX(TO_NUMBER(REGEXP_SUBSTR(TALON_FOLIO, '[0-9]+$'))), :floor) "
+                    "FROM STG_SRC.STG_TRACKIT_DESPACHO WHERE REGEXP_LIKE(TALON_FOLIO, :pattern)",
+                    floor=cfg["numbering"]["talon_start"] - 1, pattern=pattern)
+        first, last, max_num = cur.fetchone()
+        if first is None:
+            return State(None, None, cfg["numbering"]["talon_start"])
+        cur.execute("SELECT CODIGO_ECO, MAX(ODOMETRO_FINAL) FROM STG_SRC.STG_TRACKIT_DESPACHO "
+                    "WHERE ESTATUS_DESPACHO = :cerrado AND ODOMETRO_FINAL IS NOT NULL "
+                    "GROUP BY CODIGO_ECO", cerrado="CERRADO")
+        odometers = {eco: float(v) for eco, v in cur.fetchall()}
+        cur.execute("SELECT d.TALON_FOLIO, d.CODIGO_ECO, d.CODIGO_OPERADOR, TRUNC(d.FECHA_DESPACHO), "
+                    "d.HORA_DESPACHO, d.ODOMETRO_INICIAL FROM STG_SRC.STG_TRACKIT_DESPACHO d "
+                    "WHERE d.ESTATUS_DESPACHO = :abierto AND NOT EXISTS (SELECT 1 FROM "
+                    "STG_SRC.STG_TRACKIT_DESPACHO c WHERE c.TALON_FOLIO = d.TALON_FOLIO "
+                    "AND c.ESTATUS_DESPACHO = :cerrado) ORDER BY d.TALON_FOLIO",
+                    abierto="EN_TRANSITO", cerrado="CERRADO")
+        opened = []
+        for talon, eco, op, day, hhmm, odo in cur.fetchall():
+            hh, mm = int(hhmm[0:2]), int(hhmm[3:5])
+            opened.append(OpenTrip(talon, _talon_num(prefix, talon), eco, op, day.date(),
+                                   hh * 60 + mm, float(odo)))
+        opened.sort(key=lambda t: t.talon_num)
+    return State(first.date(), last.date(), int(max_num) + 1, odometers, opened)

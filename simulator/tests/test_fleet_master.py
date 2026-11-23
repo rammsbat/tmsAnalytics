@@ -100,7 +100,9 @@ def test_batch_id_is_unique_per_run_and_deterministic(cfg):
     b2 = make_batch("backfill", cfg["end_date"], cfg["seed"], 2)
     assert b1.batch_id == "SIM-BACKFILL-20261106-s42-001"
     assert b1.batch_id != b2.batch_id
-    assert b2.ingested_at > b1.ingested_at               # D7: version mas reciente
+    day = cfg["end_date"]
+    assert b2.ingested_at(day) > b1.ingested_at(day)      # D7: version mas reciente
+    assert b1.ingested_at(day + dt.timedelta(days=1)) > b2.ingested_at(day)
     assert make_batch("backfill", cfg["end_date"], cfg["seed"], 1) == b1
     assert len(b1.batch_id) <= 64
     with pytest.raises(ValueError):

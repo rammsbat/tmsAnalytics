@@ -1,4 +1,4 @@
-# Reglas de generacion del simulador TMS (Fase 3, ST-2).
+# Reglas de generacion del simulador TMS (Fase 3, ST-2/ST-3).
 # Base: .bob/skills/tms-synthetic-data-sim/templates/sim_rules_schema.yaml
 # Sin secretos. Sin reloj: toda fecha parte de `end_date` y todo azar de `seed` (decision D6).
 
@@ -21,7 +21,7 @@ date_range_backfill:
     start: "2026-11-01"
     end: "2026-11-06"
 
-# Maestros de flota (ST-2).
+# Maestros de flota.
 fleet:
   operators: 15              # el Draft reporta 15 operadores
   trailers: 100              # CAJA01..CAJA100 (una caja por tractor; CAJA05 aparece en el Draft)
@@ -29,9 +29,32 @@ fleet:
   payload_capacity_kg: 24000 # capacidad de carga util por unidad (< peso bruto max)
   model_year_range: [2022, 2026]
   policy_valid_days_range: [30, 400]   # vigencia restante de poliza respecto a end_date
-  inventory_status: "ACTIVO"           # estatus inicial de inventario (ST-3 puede re-emitir cambios)
+  inventory_status: "ACTIVO"           # estatus inicial de inventario
+  configuracion_sat: "C3R2"            # debe existir en sat_catalogs.configuracion_autotransporte
+  tipo_permiso_sct: "TPAF01"           # debe existir en sat_catalogs.tipos_permiso
 
-# Modelo de precios CFDI Ingreso 4.0: base + tarifa/km + recargos.
+# Catalogos SAT CERRADOS: unicas claves que el simulador puede emitir. ST-7 siembra
+# EDW_3FN.SAT_* con exactamente estas claves (1 a 1; una prueba lo verifica en ST-7).
+# Las descripciones son sinteticas (no sustituyen el catalogo oficial del SAT).
+sat_catalogs:
+  productos:                 # -> SAT_PRODUCTO_SERVICIO (CLAVE_PRODUCTO_SAT)
+    - { clave: "12161902", descripcion: "Detergentes y productos de limpieza del hogar (sintetico)",
+        unidad_defecto: "XBX", material_peligroso: "0", embalaje: "4G", peso_unitario_kg: 12.0 }
+    - { clave: "24112701", descripcion: "Empaques de carton corrugado (sintetico)",
+        unidad_defecto: "H87", material_peligroso: "0", embalaje: "4G", peso_unitario_kg: 2.5 }
+    - { clave: "53131608", descripcion: "Productos de higiene personal (sintetico)",
+        unidad_defecto: "XPK", material_peligroso: "0", embalaje: "4G", peso_unitario_kg: 8.0 }
+  unidades:                  # -> SAT_UNIDAD_MEDIDA (CLAVE_UNIDAD_SAT)
+    - { clave: "H87", nombre: "Pieza", simbolo: "pz" }
+    - { clave: "XBX", nombre: "Caja", simbolo: "caja" }
+    - { clave: "XPK", nombre: "Paquete", simbolo: "paq" }
+  configuracion_autotransporte:   # -> SAT_CONFIG_AUTOTRANSPORTE (CLAVE_CONFIG_SAT)
+    - { clave: "C3R2", descripcion: "Camion de 3 ejes con remolque de 2 ejes", ejes: 5, llantas: 18,
+        remolque_permitido: "1" }
+  tipos_permiso:                  # -> SAT_TIPO_PERMISO (CLAVE_TIPO_PERMISO)
+    - { clave: "TPAF01", descripcion: "Autotransporte federal de carga general" }
+
+# Modelo de precios CFDI Ingreso 4.0: base + tarifa/km + recargos (ST-4).
 # Calibracion con el Draft: ECO01 = $89,088.00 en 595 km
 #   1,000.00 + 595 * 147.50 + 325.50 (maniobras) = 89,088.00  (~ $149.73 por km)
 pricing_model:
@@ -45,7 +68,7 @@ pricing_model:
   iva_retention_rate: 0.04
   invoice_lag_days: [0, 3]
 
-# Modelo de costos: casetas IAVE, pago al operador y mantenimiento.
+# Modelo de costos: casetas IAVE, pago al operador y mantenimiento (ST-4).
 cost_model:
   tolls_iave:
     rate_per_km: 3.20
@@ -62,3 +85,45 @@ constraints:
   max_gross_weight_kg: 29685   # tractor C3R2 con remolque
   stops_per_trip: [4, 12]
   energy_efficiency_km_per_kwh: [2.0, 11.6]
+
+# Numeracion de talones (el Draft muestra GRD340). Continua entre lotes (incremental).
+numbering:
+  talon_prefix: "GRD"
+  talon_start: 340
+
+# Reparto del estatus diario de las unidades NO disponibles (la suma de `inactive` del mix).
+fleet_status:
+  inactive_split:
+    EN_MANTENIMIENTO: 0.75
+    INACTIVO: 0.25
+  initial_odometer_km_range: [5000, 60000]
+
+# Motor de viajes TrackItWeb (ST-3). Un viaje = un dia de despacho (A2); nunca cruza la medianoche.
+trip_model:
+  km_range: [120.0, 600.0]            # km totales por viaje (el Draft: 595 km)
+  speed_kmh_range: [55.0, 70.0]
+  start_minute_range: [240, 450]      # inicio entre 04:00 y 07:30
+  empty_zero_prob: 0.6                # el Draft muestra Kms Vacio = 0 en la mayoria de viajes
+  empty_km_share_range: [0.02, 0.15]  # parte de km vacios cuando no es cero
+  efficiency_mode: 5.0                # moda de la triangular de rendimiento (km/kWh)
+  battery_capacity_kwh: 450.0
+  battery_start_pct_range: [85.0, 100.0]
+  load_factor_range: [0.55, 1.0]      # fraccion de payload_capacity_kg transportada
+  items_per_trip: [1, 5]              # partidas de mercancia por viaje
+  # Retrasos gaussianos (minutos enteros, recortados a [min, max]):
+  service_minutes:        { mean: 30.0, sd: 8.0, min: 10, max: 60 }   # servicio PROGRAMADO por parada
+  service_overrun_minutes: { mean: 2.0, sd: 6.0, min: -5, max: 30 }   # desvio REAL del servicio
+  leg_delay_minutes:      { mean: 1.5, sd: 6.0, min: -5, max: 30 }    # desvio REAL por tramo (se acumula)
+  # Hora de corte del ultimo dia de cada corrida: los viajes que aun no terminan quedan
+  # EN_TRANSITO (sin FIN VIAJE) y el siguiente incremental los cierra con una nueva version (D7).
+  snapshot_minute: 1080               # 18:00
+
+# Eventos SCD2 de DIM_VEHICULO (cambio de placa). Lista vacia = sin eventos.
+# `effective_date` DEBE ser posterior al inicio del historico (inicio de la ventana de backfill;
+# P3 / A5: evita la colision con UQ (CODIGO_ECO, FECHA_INICIO_VALIDEZ)). La re-emision de
+# STG_FLOTA_UNIDADES (solo las unidades afectadas, nuevo BATCH_ID `...-E01`) lleva
+# INGESTED_AT = effective_date, y la version inicial lleva INGESTED_AT = inicio del historico.
+# Fuera de la ventana (inicio, dia operativo] el evento se OMITE con aviso.
+scd2_events:
+  - { eco: "ECO07", effective_date: "2026-10-01", change: "PLACA" }
+  - { eco: "ECO42", effective_date: "2026-10-20", change: "PLACA" }

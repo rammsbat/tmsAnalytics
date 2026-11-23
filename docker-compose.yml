@@ -171,6 +171,13 @@ services:
       ORACLE_DSN: oracle-dw:1521/FREEPDB1
       SIM_WRITER_USER: SIM_WRITER
       SIM_WRITER_PWD: ${SIM_WRITER_PWD}
+      STG_DDL_PATH: /contract/02_ddl_stg_src.sql
+    # Desarrollo (ST-3/ST-4): el código se monta para iterar sin reconstruir la imagen.
+    # El contrato DDL vive FUERA de /app para que el bind de ./simulator no lo oculte
+    # ni cree archivos vacíos en el repositorio. ST-5 re-valida el build autocontenido.
+    volumes:
+      - ./simulator:/app
+      - ./oracle/ddl/02_ddl_stg_src.sql:/contract/02_ddl_stg_src.sql:ro
     networks:
       - tms-internal-net
     depends_on:

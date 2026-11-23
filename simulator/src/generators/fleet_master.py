@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from faker import Faker
 
@@ -15,8 +16,6 @@ from ..config import status_counts
 from ..rng import derive_seed, make_rng
 
 SOURCE_SYSTEM_FLOTA = "FLOTA"
-CONFIG_SAT_TRACTOR = "C3R2"        # tractor con remolque (spec 4.2)
-TIPO_PERMISO_SCT = "TPAF01"        # autotransporte federal de carga general
 TIPO_UNIDAD = "TRACTOCAMION"
 
 # (marca, modelo): unidades electricas (el KPI de rendimiento es km/kWh).
@@ -68,6 +67,34 @@ class FleetMaster:
     policies: list[dict]
     daily_status_plan: dict[str, int] = field(default_factory=dict)  # cuenta objetivo 56/40/4
 
+    @cached_property
+    def _by_eco(self) -> dict[str, dict]:
+        return {u["CODIGO_ECO"]: u for u in self.units}
+
+    @cached_property
+    def _by_operator(self) -> dict[str, dict]:
+        return {o["CODIGO_OPERADOR"]: o for o in self.operators}
+
+    @cached_property
+    def _by_trailer(self) -> dict[str, dict]:
+        return {t["NUMERO_ECONOMICO_REMOLQUE"]: t for t in self.trailers}
+
+    def unit(self, eco: str) -> dict:
+        return self._by_eco[eco]
+
+    def operator(self, code: str) -> dict:
+        return self._by_operator[code]
+
+    def trailer_for(self, eco: str) -> str:
+        """Cada tractor jala siempre la misma caja: ECOnn -> CAJAnn."""
+        trailer = "CAJA" + eco[3:]
+        if trailer not in self._by_trailer:
+            raise KeyError(f"No existe remolque {trailer} para {eco}")
+        return trailer
+
+    def trailer_plate(self, trailer: str) -> str:
+        return self._by_trailer[trailer]["PLACA_REMOLQUE"]
+
 
 def _rfc(rng, letters: int, base_year: int) -> str:
     """RFC sintetico: N letras + AAMMDD + homoclave de 3 (personas moral=3, fisica=4)."""
@@ -86,7 +113,7 @@ def _unique(rng, used: set[str], make) -> str:
             return value
 
 
-def _plate(rng) -> str:
+def random_plate(rng) -> str:
     # Placa federal de carga: 2 digitos + 2 letras + 2 digitos (p. ej. 45AX12)
     return (f"{rng.randint(10, 99)}" + rng.choice(_PLATE_LETTERS) + rng.choice(_PLATE_LETTERS)
             + f"{rng.randint(10, 99)}")
@@ -117,7 +144,7 @@ def generate_fleet_master(cfg: dict) -> FleetMaster:
     rng_rem = make_rng(seed, "fleet.trailers")
     trailers = [{
         "NUMERO_ECONOMICO_REMOLQUE": f"CAJA{i:02d}",
-        "PLACA_REMOLQUE": _unique(rng_rem, used_plates, lambda: _plate(rng_rem)),
+        "PLACA_REMOLQUE": _unique(rng_rem, used_plates, lambda: random_plate(rng_rem)),
     } for i in range(1, fcfg["trailers"] + 1)]
 
     # --- Tractores (STG_FLOTA_UNIDADES) ----------------------------------------
@@ -128,7 +155,7 @@ def generate_fleet_master(cfg: dict) -> FleetMaster:
     for i in range(1, n_units + 1):
         brand, model = rng_u.choice(_MODELS)
         pol = policies[(i - 1) // per_policy]
-        plate = _unique(rng_u, used_plates, lambda: _plate(rng_u))
+        plate = _unique(rng_u, used_plates, lambda: random_plate(rng_u))
         vin = _unique(rng_u, used_vins, lambda: "".join(rng_u.choice(_VIN_CHARS) for _ in range(17)))
         motor = _unique(rng_u, used_motors, lambda: "MTR-" + "".join(
             rng_u.choice("0123456789ABCDEF") for _ in range(10)))
@@ -139,9 +166,9 @@ def generate_fleet_master(cfg: dict) -> FleetMaster:
             "ANIO_MODELO": rng_u.randint(y_lo, y_hi),
             "MARCA": brand,
             "MODELO": model,
-            "CONFIGURACION_SAT": CONFIG_SAT_TRACTOR,
-            "TIPO_PERMISO_SCT": TIPO_PERMISO_SCT,
-            "NUMERO_PERMISO_SCT": f"{TIPO_PERMISO_SCT}-{rng_u.randint(2019, 2025)}-{rng_u.randint(100000, 999999)}",
+            "CONFIGURACION_SAT": fcfg["configuracion_sat"],
+            "TIPO_PERMISO_SCT": fcfg["tipo_permiso_sct"],
+            "NUMERO_PERMISO_SCT": f"{fcfg['tipo_permiso_sct']}-{rng_u.randint(2019, 2025)}-{rng_u.randint(100000, 999999)}",
             "PESO_BRUTO_MAX_KG": constraints["max_gross_weight_kg"],
             "CAPACIDAD_CARGA_KG": fcfg["payload_capacity_kg"],
             "NUMERO_SERIE_VIN": vin,

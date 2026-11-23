@@ -1,4 +1,4 @@
-"""Guardrails estaticos y comportamiento del CLI/loader sin conexion a Oracle."""
+﻿"""Guardrails estaticos y comportamiento del CLI/loader sin conexion a Oracle."""
 import ast
 import pathlib
 import re
@@ -120,3 +120,25 @@ def test_cli_rejects_bad_arguments(capsys):
     assert main.main(["--mode", "backfill", "--days", "0", "--dry-run"]) == 2
     assert main.main(["--mode", "backfill", "--end-date", "no-es-fecha", "--dry-run"]) == 2
     assert "ERROR" in capsys.readouterr().err
+
+
+def test_cli_incremental_dry_run_matches_real_batch_numbering(capsys):
+    assert main.main(["--mode", "incremental", "--trips", "5", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "STG_TRACKIT_DESPACHO: filas=16 batch_id=SIM-INCREMENTAL-20261106-s42-001" in out
+    assert "STG_FLOTA_ESTATUS_DIARIO: filas=111" in out and '"viajes_cerrados_ahora": 11' in out
+
+
+def test_cli_backfill_dry_run_emits_all_st3_tables(capsys):
+    assert main.main(["--mode", "backfill", "--days", "90", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    for name, rows in (("STG_TRACKIT_DESPACHO", 5040), ("STG_TRACKIT_PARADAS", 40458),
+                       ("STG_CARTA_PORTE_CABECERA", 5040), ("STG_CARTA_PORTE_MERCANCIAS", 15236),
+                       ("STG_FLOTA_ESTATUS_DIARIO", 9000)):
+        assert f"{name}: filas={rows} " in out
+    assert "batch_id=SIM-BACKFILL-20261106-s42-001-E01" in out and "batch_id=SIM-BACKFILL-20261106-s42-001-E02" in out
+
+
+def test_scenario_module_is_pure_no_database():
+    src = (SRC / "scenario.py").read_text(encoding="utf-8").upper()
+    assert "EXECUTE(" not in src and "ORACLEDB" not in src  # el escenario es puro: sin BD

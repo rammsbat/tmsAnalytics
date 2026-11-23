@@ -4,8 +4,9 @@ Uso (dentro del contenedor):
   python -m src.main --mode backfill --days 90 [--dry-run]
   python -m src.main --mode incremental --trips 5 [--dry-run]
 
-ST-2 entrega maestros de flota (STG_FLOTA_UNIDADES). Los generadores operativos
-(TrackIt, Carta Porte, ERP) se registran en ST-3/ST-4 en `_operational_generators`.
+ST-3 emite maestros, TrackIt (despacho/paradas), Carta Porte, estatus diario de patio y los
+eventos SCD2 de placa. Las tablas financieras (CFDI/liquidaciones) llegan en ST-4.
+La corrida es atomica: un unico COMMIT al final; ante cualquier error se hace rollback total.
 """
 from __future__ import annotations
 
@@ -19,7 +20,8 @@ from pathlib import Path
 from .batch import make_batch, stamp_rows
 from .config import ConfigError, load_config, status_counts
 from .contract import ContractError, load_contract, validate_rows
-from .generators.fleet_master import SOURCE_SYSTEM_FLOTA, FleetMaster, generate_fleet_master
+from .generators.fleet_master import generate_fleet_master
+from .scenario import ScenarioResult, State, build_backfill, build_incremental
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -63,70 +65,82 @@ def _fingerprint(rows: list[dict]) -> str:
     return h.hexdigest()[:16]
 
 
-def _operational_generators(cfg: dict, master: FleetMaster, mode: str) -> dict[str, tuple[str, list[dict]]]:
-    """Gancho ST-3/ST-4: {tabla: (SOURCE_SYSTEM, filas)}. Vacio en ST-2."""
-    return {}
-
-
-def plan_tables(cfg: dict, mode: str) -> dict[str, tuple[str, list[dict]]]:
-    """Tablas a emitir en esta corrida (sin columnas de auditoria)."""
+def _scenario(cfg: dict, args: argparse.Namespace, conn) -> tuple[ScenarioResult, int]:
+    """(escenario, run_seq por defecto sin BD). El incremental parte del estado real en BD o,
+    en --dry-run, del estado que dejaria un backfill por defecto."""
     master = generate_fleet_master(cfg)
-    tables: dict[str, tuple[str, list[dict]]] = {}
-    if mode == "backfill":  # los maestros se emiten una sola vez, en el backfill
-        tables["STG_FLOTA_UNIDADES"] = (SOURCE_SYSTEM_FLOTA, master.units)
-    tables.update(_operational_generators(cfg, master, mode))
-    return tables
+    if args.mode == "backfill":
+        return build_backfill(cfg, master, cfg["_days"]), 1
+    if conn is not None:
+        from . import db_loader
+        state: State = db_loader.load_state(conn, cfg)
+        default_seq = 1
+    else:
+        state = build_backfill(cfg, master, cfg["date_range_backfill"]["days"]).end_state
+        default_seq = 1  # el BATCH_ID lleva el modo: la 1.ª corrida incremental es -001
+    return build_incremental(cfg, master, state, cfg["_trips"]), default_seq
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    conn = None
     try:
         cfg = _apply_overrides(load_config(args.config), args)
         contract = load_contract()
-        tables = plan_tables(cfg, args.mode)
-
         counts = status_counts(cfg["fleet_size"], cfg["fleet_status_mix"])
         print(f"modo={args.mode} seed={cfg['seed']} end_date={cfg['end_date']} dry_run={args.dry_run}")
         print(f"flota={cfg['fleet_size']} mezcla_objetivo={counts}")
-        if not tables:
-            print("Sin tablas que emitir: los generadores operativos llegan en ST-3/ST-4.")
-            return 0
 
-        conn = None
         if not args.dry_run:
             from . import db_loader  # import diferido: --dry-run no requiere credenciales
             conn = db_loader.connect()
-        try:
-            for name, (source, rows) in tables.items():
-                table = contract[name]
-                run_seq = args.run_seq
-                if run_seq is None:
-                    run_seq = db_loader.next_run_seq(conn, table, args.mode, cfg["end_date"], cfg["seed"]) \
-                        if conn else 1
-                batch = make_batch(args.mode, cfg["end_date"], cfg["seed"], run_seq)
-                stamped = stamp_rows(rows, batch, source)
-                validate_rows(table, stamped)
-                line = (f"{name}: filas={len(stamped)} batch_id={batch.batch_id} "
-                        f"source={source} fingerprint={_fingerprint(stamped)}")
-                if conn:
-                    inserted = db_loader.insert_rows(conn, table, stamped)
-                    verified = db_loader.count_batch(conn, table, batch.batch_id)
-                    line += f" insertadas={inserted} verificadas_en_BD={verified}"
-                    if verified != inserted:
-                        print(line)
-                        print("ERROR: el conteo verificado no coincide con lo insertado", file=sys.stderr)
-                        return 3
-                print(line)
-        finally:
+        result, run_seq = _scenario(cfg, args, conn)
+        if args.run_seq is not None:
+            run_seq = args.run_seq
+        elif conn is not None:
+            run_seq = db_loader.next_run_seq(conn, [contract[e.table] for e in result.emissions],
+                                             args.mode, cfg["end_date"], cfg["seed"])
+        for note in result.notes:
+            print(note)
+
+        for em in result.emissions:
+            if not em.rows:
+                continue
+            table = contract[em.table]
+            batch = make_batch(args.mode, cfg["end_date"], cfg["seed"], run_seq, em.suffix)
+            stamped = stamp_rows(em.rows, batch, em.source)
+            validate_rows(table, stamped)
+            line = (f"{em.table}: filas={len(stamped)} batch_id={batch.batch_id} "
+                    f"source={em.source} fingerprint={_fingerprint(stamped)}")
             if conn:
-                conn.close()
+                inserted = db_loader.insert_rows(conn, table, stamped, commit=False)
+                verified = db_loader.count_batch(conn, table, batch.batch_id)
+                line += f" insertadas={inserted} verificadas_en_BD={verified}"
+                if verified != inserted:
+                    print(line)
+                    conn.rollback()
+                    print("ERROR: el conteo verificado no coincide con lo insertado; rollback aplicado",
+                          file=sys.stderr)
+                    return 3
+            print(line)
+        if conn:
+            conn.commit()
+            print("COMMIT unico aplicado (corrida atomica)")
+        print("resumen=" + json.dumps(result.summary, sort_keys=True, default=str))
         return 0
     except (ConfigError, ContractError) as exc:
+        if conn:
+            conn.rollback()
         print(f"ERROR de configuracion/contrato: {exc}", file=sys.stderr)
         return 2
     except Exception as exc:  # LoaderError y similares: mensajes ya saneados
+        if conn:
+            conn.rollback()
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+    finally:
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":
