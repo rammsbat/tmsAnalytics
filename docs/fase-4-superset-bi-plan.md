@@ -6,7 +6,7 @@
 **Skill:** `superset-oracle-drillacross`  
 **Conexión Objetivo:** `Analytics_TMS_Oracle` (`BI_READER` sobre esquemas `BI_SEMANTIC` y `DWH_MART`)  
 **Fecha de Elaboración:** 2026-11-23  
-**Estado General:** `[ ] pendiente de aprobación`  
+**Estado General:** `[x] done` — ST-0..ST-6 completados; auditoría `docs/audits/audit-fase-4.md` con 0 BLOCKER y 0 HIGH abiertos (pendiente solo el push a `origin/main` bajo aprobación).
 
 ---
 
@@ -221,8 +221,29 @@ docker exec tms-superset-app python /tmp/tests/test_superset_kpi_reconciliation.
 3. Redactar y versionar `docs/audits/audit-fase-4.md`.
 4. Realizar commits atómicos en Git (`feat(bi): ...`, `docs: ...`).
 
-**Relevant Context:** `.bob/skills/actor-critic-dw-review/SKILL.md`, `docs/IBM_BOB_SDLC_ANALYTICS_TMS_SPEC.md` §7 Fase 4.  
-**Status:** `[ ] pending`
+**Relevant Context:** `.bob/skills/actor-critic-dw-review/SKILL.md`, `docs/IBM_BOB_SDLC_ANALYTICS_TMS_SPEC.md` §7 Fase 4.
+**Entregables:** `docs/audits/audit-fase-4.md`, `tools/benchmark_dashboard_latency.py`.
+**Status:** `[x] done` (3 subagentes `explore` [Seguridad/Licencias, Kimball, Cobertura BI] + verificación propia del Actor. Detectados y **remediados** 2 BLOCKER [ds_02 y ds_03 combinaban hechos con `INNER JOIN` en vez de `FULL OUTER JOIN`] y 1 HIGH [`superset-worker`/`superset-beat` con `healthcheck: disable: true`; ahora `healthy`]. Re-validado: EXPLAIN 16/16 PASS, KPIs 8/8 grupos y 259 aserciones PASS, charts en vivo 100 % PASS, auditor de cero secretos PASS, re-importación idempotente. **DoD #5:** p95 frío 2.26 s / caliente 0.21 s < 3 s. Quedan abiertos 2 MEDIUM aceptados: F-04 CSRF/Talisman deshabilitados [habilitar antes de exponer fuera de local] y F-05 conciliación fila por fila del Bloque 8.)
+
+#### Resultados de ST-6
+
+| Dimensión | Veredicto | Evidencia |
+|---|---|---|
+| Seguridad y cero secretos | ✅ PASS | `audit_superset_assets.py` PASS sobre el bundle y escaneo del repo: 0 credenciales literales, 0 claves privadas, `.env`/`profiles.yml` ignorados. La URI `oracle+cx_oracle://…${BI_READER_PWD}…` es un **falso positivo documentado**: SQLAlchemy 1.4 exige ese esquema y `superset_config.py` lo puentea a `python-oracledb` Thin Mode (`sys.modules["cx_Oracle"] = oracledb`). |
+| Licenciamiento $0 / SE2 | ✅ PASS | Solo `valkey/valkey:8-alpine`; 0 `redis:*`; 0 `PARTITION BY` DDL, `COMPRESS FOR`, `ENABLE QUERY REWRITE`. |
+| Conformidad Kimball | ✅ PASS (tras remediación) | 0 joins Fact↔Fact; Drill-Across `FULL OUTER JOIN` en ds_02, ds_03, ds_06, ds_07; `DISTANCIA_DECLARADA_KM` colapsada por `UUID_CCP` en ds_06/07/08. |
+| Cobertura funcional BI | ✅ PASS | 7 bloques + B8, 8 datasets, 12 charts, 4 Native Filters; 259 aserciones de conciliación. |
+
+**Latencia (DoD #5)** — `tools/benchmark_dashboard_latency.py`, HTTP real sobre `/api/v1/chart/data`, 12 charts en paralelo, 5 escenarios × 5 repeticiones:
+
+| Medición | p50 | p95 | Resultado |
+|---|---|---|---|
+| Chart individual, frío (`force`, Oracle) | 1,750 ms | 1,998 ms | ✅ < 3 s |
+| Chart individual, caliente (Valkey, `is_cached`) | 142 ms | 195 ms | ✅ < 3 s |
+| Dashboard completo, frío | 1,812 ms | 2,261 ms | ✅ < 3 s |
+| Dashboard completo, caliente | 156 ms | 205 ms | ✅ < 3 s |
+
+Aceleración por caché ×12.0; 0 errores; 0 respuestas calientes sin `is_cached`.
 
 ---
 
@@ -257,3 +278,20 @@ docker exec tms-superset-app python /tmp/tests/test_superset_kpi_reconciliation.
    - Exportación limpia de assets (Dashboard/Charts YAML/JSON) en `superset/assets/` sin secretos ni contraseñas.
    - Script de conciliación automatizado (`tests/test_superset_kpi_reconciliation.py`).
    - Reporte de auditoría `docs/audits/audit-fase-4.md` con 0 hallazgos BLOCKER.
+
+### Tabla de Verificación del DoD (cierre de Fase 4)
+
+| # | Criterio de aceptación | Estado | Evidencia | Sub-task |
+|---|---|---|---|---|
+| 1 | Cobertura visual de los 7 bloques (+ B8) sin errores ni productos cartesianos | ✅ Cumplido | 12 charts en 8 escenarios en vivo: 100 % PASS; 0 cartesianos en los 16 planes | ST-3, ST-6 |
+| 2 | Filter pushdown Jinja verificado en Oracle SE2 | ✅ Cumplido | `verify_explain_plans.py`: 16/16 planes PASS (8 vacíos + 8 multivalor) con `EXPLAIN PLAN` + `DBMS_XPLAN` como `BI_READER`; filtros inyectados en cada CTE antes del `FULL OUTER JOIN` | ST-2, ST-6 (re-ejecutado tras la remediación) |
+| 3 | Conformidad Kimball y licenciamiento | ✅ Cumplido tras remediar 2 BLOCKER | 0 joins Fact↔Fact; `FULL OUTER JOIN` en ds_02/03/06/07 (ds_02 y ds_03 corregidos en ST-6); solo `valkey/valkey:8-alpine`; 0 `PARTITION BY`/`COMPRESS`/`QUERY REWRITE` | ST-6 |
+| 4 | Conciliación numérica contra el DW real | ✅ Cumplido | `test_superset_kpi_reconciliation.py`: 8/8 grupos, 259 aserciones (corte 11-06, mes, 90 días, 91 días, día 91, `DISTANCIA_DECLARADA_KM`). Línea base de Fase 3 explicada | ST-5, ST-6 (re-ejecutado) |
+| 5 | Rendimiento: p95 < 3 s con caché Valkey activa | ✅ Cumplido | HTTP real, 12 charts en paralelo: p95 frío 2.26 s, p95 caliente 0.21 s, ×12.0 por caché, 0 errores | ST-6 |
+| 6a | Datasets SQL Jinja en `superset/assets/datasets/` | ✅ Cumplido | 8 archivos `ds_01..ds_08` | ST-1 |
+| 6b | Matriz de trazabilidad `dashboard_mapping.md` | ✅ Cumplido | 12 charts por nombre y UUID, coincidentes con el bundle | ST-3, ST-4 |
+| 6c | Exportación limpia de assets sin secretos | ✅ Cumplido | Bundle YAML de 23 archivos; `audit_superset_assets.py` PASS; placeholder `${BI_READER_PWD}`; re-importación idempotente | ST-4, ST-6 |
+| 6d | Script de conciliación automatizado | ✅ Cumplido | `tests/test_superset_kpi_reconciliation.py` | ST-5 |
+| 6e | Reporte de auditoría con 0 BLOCKER | ✅ Cumplido | `docs/audits/audit-fase-4.md`: 0 BLOCKER, 0 HIGH abiertos (2 BLOCKER y 1 HIGH detectados y remediados) | ST-6 |
+
+**Observaciones MEDIUM abiertas y aceptadas (no bloqueantes):** F-04 `WTF_CSRF_ENABLED`/`TALISMAN_ENABLED` deshabilitados (aceptado solo para `localhost`; **obligatorio habilitarlos, junto con TLS / proxy inverso, antes de cualquier despliegue fuera de local**; `superset_config.py` no se modifica en Fase 4) y F-05 conciliación fila por fila del Bloque 8. Detalle en `docs/audits/audit-fase-4.md`.
