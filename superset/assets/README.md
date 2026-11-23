@@ -32,6 +32,10 @@ docker exec tms-superset-app python /tmp/tools/import_superset_assets.py
 # 5. Validar charts contra Oracle (Thin Mode)
 docker cp tools/test_superset_live_charts.py tms-superset-app:/tmp/tools/
 docker exec tms-superset-app python /tmp/tools/test_superset_live_charts.py
+
+# 6. Latencia frío vs caliente (DoD #5: p95 < 3 s con caché Valkey)
+docker cp tools/benchmark_dashboard_latency.py tms-superset-app:/tmp/tools/
+docker exec tms-superset-app python /tmp/tools/benchmark_dashboard_latency.py
 ```
 
 ## Garantías (Regla 03)
