@@ -583,7 +583,30 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `05_views_bi_semantic.sql` §4–§6 (MVs, SP, grants), `docs/mcp_oracle_readonly.md`, `.bob/skills/actor-critic-dw-review/SKILL.md`, `docs/IBM_BOB_SDLC_ANALYTICS_TMS_SPEC.md` §7 Fase 3. Modo: `agent`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (refresco semántico en on-run-end, carga incremental validada, volumen temporal retirado y auditoría Actor-Crítico aprobada sin bloqueadores)
+
+#### Resultado ST-11 (verificado en vivo)
+- **Macro de refresco semántico y hook `on-run-end`:**
+  - Se implementó `etl/dbt_tms/macros/refresh_semantic_layer.sql` invocando `BI_SEMANTIC.SP_REFRESH_MV_SEMANTIC` de forma atómica y segura (`AUTHID DEFINER`) mediante bloque PL/SQL estático sin interpolación.
+  - Enlazado en `dbt_project.yml` mediante `on-run-end: ["{{ refresh_semantic_layer() }}"]`. Se ejecuta automáticamente en cada corrida de `dbt build`, `dbt run` o `dbt test`.
+- **Verificación semántica con MCP `BI_READER` (post-backfill 90 días):**
+  - `MV_METRICAS_FLOTA_DIARIA`: 90 días evaluados (2026-08-09 al 2026-11-06), `TOTAL_UNIDADES_FLOTA = 100` diario (min 100, max 100), `PCT_CON_VIAJE = 56.00 %`, `PCT_SIN_VIAJE = 40.00 %`, `PCT_INACTIVAS = 4.00 %`, `TOTAL_KMS_DIA = 1,820,487.49`, `TOTAL_KWH_DIA = 326,806.52`.
+  - `MV_PRODUCTIVIDAD_ECO_MENSUAL`: 399 filas (100 unidades), `5,040` viajes, `5,029` cerrados, `1,820,487.49` kms, `$309,227,803.56` facturación, `$17,855,296.07` gastos, rendimiento promedio `5.68 km/kWh` (rango físico `3.49 .. 10.83 km/kWh`).
+  - Todas las vistas base (`VW_FACT_*`, `VW_DIM_*`, vistas de rol de ubicación `VW_DIM_UBICACION_ORIGEN/DESTINO/PARADA`) consultadas con `BI_READER` con 0 errores `ORA-`.
+- **Corrida incremental y prueba SCD2 (`ECO15@2026-11-07` + 5 viajes):**
+  - Simulador ejecutado con `docker compose run --rm data-simulator python -m src.main --mode incremental --trips 5`: insertó 1 versión v2 de `ECO15`, 16 despachos (11 cierres del día 90 + 5 nuevos del día 91), 151 paradas, 5 CCPs, 13 mercancías, 111 estatus de flota, 14 CFDIs y 67 líneas de gastos.
+  - `DIM_VEHICULO` en `DWH_MART`: `ECO15` cuenta ahora con **2 versiones** (v1 `98JM19` 2026-08-09 a 2026-11-06 inactiva; v2 `47LL35` 2026-11-07 a `NULL` activa). Total: 102 filas, 100 vehículos reales activos + 1 dummy `-1` activo.
+  - `FACT_DESPACHO_VIAJE`: 5,045 viajes totales, exactamente 2 viajes abiertos restantes (los 11 anteriores cerraron y se actualizaron por `MERGE`).
+  - `FACT_FACTURACION_FLETE`: 5,043 facturas conciliadas.
+  - `FACT_SNAPSHOT_FLOTA_DIARIO`: 9,100 filas (91 días × 100 unidades).
+  - `MV_METRICAS_FLOTA_DIARIA`: 91 días, 100 unidades/día, `1,827,114.49` kms y `327,999.20` kWh acumulados.
+- **Retiro del volumen temporal de desarrollo:**
+  - Se eliminó `./etl/dbt_tms:/app/dbt_tms:ro` de `docker-compose.yml`.
+  - La imagen `analytics-tms-etl:local` fue reconstruida con el código dbt horneado en `/app/dbt_tms/`.
+  - Verificada en contenedor autocontenido: `dbt debug` pasa 100 % y `dbt test` ejecuta **404/404 pruebas en verde (0 WARN, 0 ERROR, 0 SKIP)** en ~12.5 s.
+- **Auditoría automatizada Actor-Crítico (`actor-critic-dw-review`):**
+  - 3 subagentes de exploración evaluaron Seguridad/Licenciamiento, Conformidad Kimball y Cobertura Funcional de BI.
+  - **0 hallazgos BLOCKER.** Informe consolidado en `docs/audits/audit-fase-3.md`.
 
 ---
 
@@ -677,4 +700,53 @@ ST-0 (Spike dbt-oracle y decisiones)
 **Decisiones resultantes:** D1 se mantiene (por IDENTITY); D2 pasa a `view` en `ETL_RUNNER` para `staging` (ephemeral sigue siendo válido); D9 usa `protocol: tcp`; versiones fijadas `dbt-core==1.12.7`, `dbt-oracle==1.12.0`; `06_etl_grants.sql` se limita a revocar `DELETE` de `SIM_WRITER` sobre `STG_SRC` (D5).
 
 ## Cierre de Fase 3: Resultados de Validación (DoD)
-_Pendiente. Se completará en ST-11 con: conteos por capa, resultado de `dbt build`/`dbt test` (aprobados/fallidos), porcentajes del snapshot, verificación con `BI_READER` y hallazgos de la auditoría Actor‑Crítico._
+
+### 1. Resumen de Ejecución y Suite de Pruebas
+- **Pruebas del Simulador Python (`pytest`):** **75 / 75 PASS** (guardrails, determinismo, contratos DDL, finanzas, viajes).
+- **Pruebas de Calidad dbt (`dbt test`):** **404 / 404 PASS (0 WARN, 0 ERROR, 0 SKIP)** ejecutados en ~12.5 s en contenedor autocontenido `etl-runner`.
+- **Refresco de Capa Semántica:** Invocado automáticamente en `on-run-end` vía `BI_SEMANTIC.SP_REFRESH_MV_SEMANTIC`.
+
+### 2. Conteos Consolidados por Capa
+
+| Capa / Objeto | Filas (Post-Incremental) | Llaves Distintas | Grano / Notas |
+|---|---|---|---|
+| **STG_SRC** | **102,795** | N/A | 8 tablas de ingesta cruda (Backfill 90d + Incremental 1d) |
+| **EDW_3FN** | | | Integridad referencial 3FN estricta |
+| ├─ `CAT_VEHICULOS` | 100 | 100 | `CODIGO_ECO` único |
+| ├─ `CAT_REMOLQUES` | 100 | 100 | `NUMERO_ECONOMICO_REMOLQUE` |
+| ├─ `CAT_OPERADORES` | 15 | 15 | `CODIGO_OPERADOR` |
+| ├─ `CAT_CLIENTES` | 6 | 6 | `RFC_CLIENTE` |
+| ├─ `CAT_UBICACIONES` | 8 | 8 | `CODIGO_UBICACION` con geografía SAT |
+| ├─ `CAT_POLIZAS_SEGURO` | 10 | 10 | `NUMERO_POLIZA` |
+| ├─ `OP_VIAJES_DESPACHO` | 5,045 | 5,045 | 5,043 cerrados + 2 abiertos |
+| ├─ `OP_VIAJES_PARADAS` | 40,495 | 40,495 | 4 a 12 paradas/viaje |
+| ├─ `OP_FLOTA_ESTATUS_DIARIO` | 9,100 | 9,100 | 100 unidades × 91 días |
+| ├─ `FISCAL_CFDI_CARTAPORTE` | 5,045 | 5,045 | 1 CCP por viaje |
+| ├─ `FISCAL_CARTAPORTE_MERCANCIAS` | 15,249 | 15,249 | 1 a 5 partidas por viaje |
+| ├─ `FISCAL_CFDI_INGRESO` | 5,043 | 5,043 | 1 CFDI por viaje cerrado |
+| └─ `OP_LIQUIDACIONES_GASTOS` | 22,578 | 22,578 | Detalle atómico de gastos |
+| **DWH_MART** | | | Constelación Kimball con FKs `NVL(-1)` y SKs enteras |
+| ├─ `DIM_FECHA` | 366 | 365 + `-1` | Calendario 2026 |
+| ├─ `DIM_HORA` | 1,441 | 1,440 + `-1` | Minutos del día |
+| ├─ `DIM_VEHICULO` (SCD2) | 102 | 100 activas + 1 inactiva + `-1` | `ECO15` con v1 (inactiva) y v2 (activa) |
+| ├─ `DIM_REMOLQUE` | 101 | 100 + `-1` | Remolques conformados |
+| ├─ `DIM_OPERADOR` | 16 | 15 + `-1` | Operadores conformados |
+| ├─ `DIM_CLIENTE` | 7 | 6 + `-1` | Clientes conformados |
+| ├─ `DIM_UBICACION` | 9 | 8 + `-1` | Ubicaciones conformadas |
+| ├─ `DIM_PRODUCTO_SAT` | 4 | 3 + `-1` | Catálogo SAT |
+| ├─ `DIM_POLIZA` | 11 | 10 + `-1` | Pólizas de seguro |
+| ├─ `DIM_PERFIL_VIAJE` | 3 | 2 + `-1` | Perfiles conformados |
+| ├─ `FACT_DESPACHO_VIAJE` | 5,045 | 5,045 | 1 por viaje (5,043 cerrados + 2 abiertos) |
+| ├─ `FACT_EVENTOS_PARADA` | 40,495 | 40,495 | 1 por parada con métricas de retraso/estadía |
+| ├─ `FACT_LINEAS_CARGA_CARTAPORTE` | 15,249 | 15,249 | 1 por partida con 7 FKs conformadas |
+| ├─ `FACT_FACTURACION_FLETE` | 5,043 | 5,043 | 1 por CFDI Ingreso 4.0 |
+| ├─ `FACT_GASTOS_LIQUIDACION` | 10,402 | 10,402 | Agregado y pivotado por `(folio, tipo)` |
+| └─ `FACT_SNAPSHOT_FLOTA_DIARIO` | 9,100 | 9,100 | 100 unidades × 91 días |
+| **BI_SEMANTIC** | | | Consumo Superset ($0 SE2) |
+| ├─ `MV_METRICAS_FLOTA_DIARIA` | 91 | 91 días | 100 uds/día (56 % con viaje, 40 % sin viaje, 4 % inactiva) |
+| └─ `MV_PRODUCTIVIDAD_ECO_MENSUAL` | 399 | 100 unidades | Drill-Across mensual sin uniones Fact↔Fact directas |
+
+### 3. Veredicto de Auditoría y Estado de Promoción
+- **Auditoría Actor-Crítico:** **0 BLOCKERS** registrado en `docs/audits/audit-fase-3.md`.
+- **Cero Secretos y Licenciamiento $0:** Conformes en `.env.example`, `docker-compose.yml` (Valkey 8) y Oracle SE2.
+- **Fase 3 COMPLETADA con éxito al 100 %.**
