@@ -214,7 +214,20 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `02_ddl_stg_src.sql` tablas 1, 2, 3, 4, 5, 6; `data-sim-eng` customInstructions (Kms_Total, peso, FIN VIAJE); `draft_dashboard_kpis.md` (Kms Vacío = 0, Cargado 3,710 en el mes como referencia de orden de magnitud). Modo: `data-sim-eng`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-4)
+
+**Resultado ST-3 (verificado):**
+- Módulos nuevos: `generators/trackit_ops.py` (viaje = función pura de `seed`+talón), `generators/carta_porte.py`, `generators/fleet_status.py`, `scenario.py` (calendario, operadores **con reemplazo**, viajes abiertos/cierre, `PlateBook` SCD2). `db_loader.py` suma `load_state` (solo `SELECT` con binds) y `next_run_seq` por **corrida** (excluye lotes `-Exx`); `main.py` emite todas las tablas con **un único `COMMIT`** (rollback total ante error).
+- Catálogos SAT cerrados en `config_rules.yaml` (`sat_catalogs`): productos `12161902`, `24112701`, `53131608`; unidades `H87`, `XBX`, `XPK`; config `C3R2`; permiso `TPAF01`. Una prueba verifica que todo lo emitido ⊂ catálogo; ST-7 los siembra 1 a 1.
+- `INGESTED_AT` por fila = día operativo 23:00:00 + `run_seq` s (D7): el cierre de un viaje (día siguiente) y el cambio de placa (fecha efectiva) siempre superan a la versión previa.
+- SCD2 (P3): `ECO07@2026-10-01` y `ECO42@2026-10-20`, ambas **posteriores** al inicio del histórico (2026-08-09); re-emisión de 1 fila por evento con lote `…-001-E01/-E02`. Carta Porte usa la placa vigente ese día. Eventos fuera de ventana se omiten con aviso.
+- **Defecto hallado y corregido durante ST-3:** `allocate()` no normalizaba pesos arbitrarios y los tramos de un viaje sumaban ≫ `KMS_TOTAL` (el viaje GRD340 “no cabía en un día”); ahora normaliza. Cubierto por pruebas.
+- `pytest`: **67 pruebas en verde** (41 de ST-2 + 26 nuevas: 56/40/4 diario, `CON_VIAJE` ≡ despachos, `KMS_TOTAL`, rendimiento, 4–12 paradas, peso ≤ 29,685, un viaje = un día, odómetros continuos, operadores con reemplazo, SAT cerrado, SCD2, incremental, determinismo, contrato DDL de cada tabla).
+- `--dry-run` backfill 90 días (determinista, mismos *fingerprints* que la carga real): `STG_FLOTA_UNIDADES` 100 (+1 +1 eventos), `STG_TRACKIT_DESPACHO` 5,040, `STG_TRACKIT_PARADAS` 40,458, `STG_CARTA_PORTE_CABECERA` 5,040, `STG_CARTA_PORTE_MERCANCIAS` 15,236, `STG_FLOTA_ESTATUS_DIARIO` 9,000 (90 × 100). 11 viajes abiertos al corte (18:00 del último día).
+- `--dry-run` incremental `--trips 5`: 16 despachos (11 cierres + 5 nuevos), 111 estatus (11 del día previo + 100 del día nuevo).
+- **Carga real validada** (backfill + incremental como `SIM_WRITER`; conteos verificados en BD = insertados): 100 filas/día en 90 días; mezcla 56 % / 40 % / 3 % mantenimiento / 1 % inactivo; `CON_VIAJE` vs despachos: 0 diferencias en ambos sentidos; 0 violaciones de `KMS_TOTAL` o peso; rendimiento 2.14–11.40; paradas 4–12; peso CCP = Σ mercancías; 0 nulos de auditoría; tras el incremental 11 talones con 2 versiones y el cierre gana por `INGESTED_AT DESC`.
+- Los datos de validación se **eliminaron** con `ETL_RUNNER`; `STG_SRC` queda vacío para el backfill oficial de ST-5. `./simulator` está montado como volumen (no hace falta reconstruir la imagen al cambiar código).
+- Pendiente para ST-4: `STG_CFDI_INGRESO` y `STG_LIQUIDACIONES_GASTOS`.
 
 ---
 
