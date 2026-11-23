@@ -1,0 +1,17 @@
+# Plantilla de perfil dbt-oracle (Thin Mode). En la imagen se copia como profiles.yml
+# dentro de DBT_PROFILES_DIR. Solo env_var(...): sin credenciales en el repositorio.
+# Nota (ST-0): el protocolo Thin es `tcp`; `thin` falla con DPY-4021.
+tms_oracle:
+  target: etl
+  outputs:
+    etl:
+      type: oracle
+      protocol: tcp
+      host: "{{ env_var('ORACLE_HOST') }}"
+      port: "{{ env_var('ORACLE_PORT') | as_number }}"
+      service: "{{ env_var('ORACLE_SERVICE') }}"
+      user: "{{ env_var('ETL_RUNNER_USER', 'ETL_RUNNER') }}"
+      password: "{{ env_var('ETL_RUNNER_PWD') }}"
+      schema: "{{ env_var('ETL_RUNNER_USER', 'ETL_RUNNER') }}"
+      database: "{{ env_var('ORACLE_SERVICE') }}"
+      threads: 4

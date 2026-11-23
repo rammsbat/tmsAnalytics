@@ -155,6 +155,65 @@ services:
       superset-valkey:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # 7. Simulador de datos sintéticos (perfil "sim"; escribe solo en STG_SRC)
+  #    Uso: docker compose --profile sim run --rm data-simulator python -m src.main --mode backfill --days 90
+  # ---------------------------------------------------------------------------
+  data-simulator:
+    profiles: ["sim"]
+    image: analytics-tms-simulator:local
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    container_name: tms-data-simulator
+    user: "appuser"
+    environment:
+      ORACLE_DSN: oracle-dw:1521/FREEPDB1
+      SIM_WRITER_USER: SIM_WRITER
+      SIM_WRITER_PWD: ${SIM_WRITER_PWD}
+    networks:
+      - tms-internal-net
+    depends_on:
+      oracle-dw:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import oracledb, yaml, numpy, faker"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # 8. ELT dbt-oracle (perfil "etl"; ejecuta como ETL_RUNNER)
+  #    Uso: docker compose --profile etl run --rm etl-runner dbt debug
+  # ---------------------------------------------------------------------------
+  etl-runner:
+    profiles: ["etl"]
+    image: analytics-tms-etl:local
+    build:
+      context: .
+      dockerfile: etl/Dockerfile
+    container_name: tms-etl-runner
+    user: "appuser"
+    environment:
+      ORACLE_DSN: oracle-dw:1521/FREEPDB1
+      ORACLE_HOST: oracle-dw
+      ORACLE_PORT: "1521"
+      ORACLE_SERVICE: FREEPDB1
+      ETL_RUNNER_USER: ETL_RUNNER
+      ETL_RUNNER_PWD: ${ETL_RUNNER_PWD}
+    networks:
+      - tms-internal-net
+    depends_on:
+      oracle-dw:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import oracledb, dbt.version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
 networks:
   tms-internal-net:
     driver: bridge

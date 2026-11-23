@@ -25,3 +25,6 @@ valkey_data/
 
 # Entornos virtuales de herramientas locales
 tools/**/.venv/
+
+# dbt profile materializado (solo plantilla versionada)
+etl/dbt_tms/profiles.yml

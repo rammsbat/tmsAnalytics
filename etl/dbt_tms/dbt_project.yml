@@ -1,0 +1,30 @@
+name: tms_dbt
+version: "1.0.0"
+config-version: 2
+
+profile: tms_oracle
+
+# target-path / log-path se controlan con DBT_TARGET_PATH / DBT_LOG_PATH (env)
+# para evitar deprecation warnings en dbt 1.12.
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+clean-targets: ["dbt_packages"]
+
+models:
+  tms_dbt:
+    # Staging: ephemeral (sin objetos en STG_SRC ni en BD)
+    staging:
+      +materialized: ephemeral
+    # Capas destino: la materializacion merge_existing se declara en ST-6
+    edw_3fn:
+      +schema: EDW_3FN
+    marts:
+      +schema: DWH_MART
+
+seeds:
+  tms_dbt:
+    # Catalogos semilla: se materializan en el esquema propio de ETL_RUNNER
+    # y luego se llevan por MERGE a EDW_3FN.
+    +quote_columns: false

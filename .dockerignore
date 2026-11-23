@@ -25,3 +25,7 @@ dbt_packages/
 # Logs and temporary files
 *.log
 .bob/tmp/
+
+# dbt profile materializado y artefactos
+profiles.yml
+logs/
