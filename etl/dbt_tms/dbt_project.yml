@@ -12,6 +12,9 @@ seed-paths: ["seeds"]
 test-paths: ["tests"]
 clean-targets: ["dbt_packages"]
 
+on-run-end:
+  - "{{ refresh_semantic_layer() }}"
+
 models:
   tms_dbt:
     # Staging: ephemeral (sin objetos en STG_SRC ni en BD)
