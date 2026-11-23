@@ -1,0 +1,146 @@
+version: 2
+
+# ST-9: tests de las 6 tablas de hechos de DWH_MART. Las FKs son NOT NULL (lookup fallido -> -1); la integridad
+# referencial se prueba contra las dimensiones y los -1 permitidos se acotan en tests/marts_fact_*.sql.
+models:
+  - name: fact_despacho_viaje
+    columns:
+      - name: ID_FACT_DESPACHO
+        data_tests: [not_null, unique]
+      - name: NUMERO_TALON
+        data_tests: [not_null, unique]
+      - name: ID_FECHA_INICIO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_HORA_INICIO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_hora'), field: ID_HORA}}}]
+      - name: ID_FECHA_CIERRE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_vehiculo'), field: ID_VEHICULO}}}]
+      - name: ID_REMOLQUE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_remolque'), field: ID_REMOLQUE}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_operador'), field: ID_OPERADOR}}}]
+      - name: ID_CLIENTE_ORIGEN
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_cliente'), field: ID_CLIENTE}}}]
+      - name: ID_CLIENTE_DESTINO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_cliente'), field: ID_CLIENTE}}}]
+      - name: ID_PERFIL_VIAJE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_perfil_viaje'), field: ID_PERFIL_VIAJE}}}]
+      - name: CONTADOR_DESPACHO
+        data_tests: [{accepted_values: {arguments: {values: [1]}}}]
+      - name: CONTADOR_CERRADO
+        data_tests: [{accepted_values: {arguments: {values: [0, 1]}}}]
+
+  - name: fact_eventos_parada
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [NUMERO_TALON, NUMERO_SECUENCIA]}
+    columns:
+      - name: ID_FACT_PARADA
+        data_tests: [not_null, unique]
+      - name: NUMERO_TALON
+        data_tests: [not_null]
+      - name: NUMERO_SECUENCIA
+        data_tests: [not_null]
+      - name: ID_FECHA_LLEGADA
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_HORA_LLEGADA
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_hora'), field: ID_HORA}}}]
+      - name: ID_FECHA_SALIDA
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_HORA_SALIDA
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_hora'), field: ID_HORA}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_vehiculo'), field: ID_VEHICULO}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_operador'), field: ID_OPERADOR}}}]
+      - name: ID_UBICACION_PARADA
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_ubicacion'), field: ID_UBICACION}}}]
+      - name: CONTADOR_PARADA
+        data_tests: [{accepted_values: {arguments: {values: [0, 1]}}}]
+      - name: CONTADOR_PUNTUAL
+        data_tests: [{accepted_values: {arguments: {values: [0, 1]}}}]
+
+  - name: fact_lineas_carga_cartaporte
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [UUID_CCP, NUMERO_PARTIDA]}
+    columns:
+      - name: ID_FACT_LINEA_CARGA
+        data_tests: [not_null, unique]
+      - name: UUID_CCP
+        data_tests: [not_null]
+      - name: ID_FECHA_EMISION
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_vehiculo'), field: ID_VEHICULO}}}]
+      - name: ID_REMOLQUE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_remolque'), field: ID_REMOLQUE}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_operador'), field: ID_OPERADOR}}}]
+      - name: ID_CLIENTE_REMITENTE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_cliente'), field: ID_CLIENTE}}}]
+      - name: ID_CLIENTE_DESTINATARIO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_cliente'), field: ID_CLIENTE}}}]
+      - name: ID_ORIGEN_UBICACION
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_ubicacion'), field: ID_UBICACION}}}]
+      - name: ID_DESTINO_UBICACION
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_ubicacion'), field: ID_UBICACION}}}]
+      - name: ID_PRODUCTO_SAT
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_producto_sat'), field: ID_PRODUCTO_SAT}}}]
+      - name: ID_POLIZA
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_poliza'), field: ID_POLIZA}}}]
+
+  - name: fact_facturacion_flete
+    columns:
+      - name: ID_FACT_FACTURACION
+        data_tests: [not_null, unique]
+      - name: UUID_INGRESO
+        data_tests: [not_null, unique]
+      - name: ID_FECHA_FACTURACION
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_vehiculo'), field: ID_VEHICULO}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_operador'), field: ID_OPERADOR}}}]
+      - name: ID_CLIENTE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_cliente'), field: ID_CLIENTE}}}]
+      - name: ID_DESTINO_UBICACION
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_ubicacion'), field: ID_UBICACION}}}]
+
+  - name: fact_gastos_liquidacion
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [FOLIO_LIQ, TIPO_GASTO]}
+    columns:
+      - name: ID_FACT_GASTO
+        data_tests: [not_null, unique]
+      - name: TIPO_GASTO
+        data_tests:
+          - accepted_values:
+              arguments: {values: ["CASETA", "OPERADOR", "MANTENIMIENTO", "COMBUSTIBLE_ENERGIA", "OTROS"]}
+      - name: ID_FECHA_LIQUIDACION
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_vehiculo'), field: ID_VEHICULO}}}]
+      - name: ID_REMOLQUE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_remolque'), field: ID_REMOLQUE}}}]
+      - name: ID_OPERADOR
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_operador'), field: ID_OPERADOR}}}]
+
+  - name: fact_snapshot_flota_diario
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [ID_FECHA_CORTE, ID_VEHICULO]}
+    columns:
+      - name: ID_FACT_SNAPSHOT_FLOTA
+        data_tests: [not_null, unique]
+      - name: ID_FECHA_CORTE
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_fecha'), field: ID_FECHA}}}]
+      - name: ID_VEHICULO
+        data_tests: [not_null, {relationships: {arguments: {to: ref('dim_vehiculo'), field: ID_VEHICULO}}}]
+      - name: ESTATUS_UNIDAD
+        data_tests:
+          - accepted_values:
+              arguments: {values: ["DISPONIBLE_CON_VIAJE", "DISPONIBLE_SIN_VIAJE", "EN_MANTENIMIENTO", "INACTIVO"]}

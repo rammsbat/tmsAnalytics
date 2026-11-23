@@ -13,11 +13,7 @@ with perfiles as (
         'DESTINO'   as TIPO_COBRO_FLETE,
         'COMPLETO'  as TIPO_COBRO_CASETAS,
         'DESTINO'   as PAGO_OPERADOR,
-        case ESTATUS_DESPACHO
-            when 'EN_TRANSITO' then 'TRANSITO'
-            when 'CERRADO'     then 'CERRADO'
-            else ESTATUS_DESPACHO
-        end         as ETAPA_VIAJE
+        {{ etapa_viaje('ESTATUS_DESPACHO') }} as ETAPA_VIAJE
     from {{ ref('op_viajes_despacho') }}
 )
 select
