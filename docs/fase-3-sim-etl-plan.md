@@ -412,7 +412,39 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `04_ddl_dwh_mart.sql` §1–§2 (UQs, `-1`), `.bob/rules/01-kimball-architecture.md` §3. Modo: `dw-architect-oracle`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-9; sin commit aún)
+
+#### Resultado ST-8
+
+- **Precisión 1 — SCD2 incremental diferido a ST-11:** no se ejecutó el simulador en `--mode incremental` (la BD sigue con el backfill limpio de 90 días: `STG_TRACKIT_DESPACHO` = 5,040 viajes). La prueba real de `ECO15@2026-11-07` se corre en ST-11 tras certificar hechos (ST-9) y screens (ST-10). En ST-8 se hizo una comprobación **aislada** de `scd2_existing` (ver abajo) y se revirtió.
+- **Modelos** (`models/marts/dimensions/`, `+materialized: merge_existing`; `dim_vehiculo` con `scd2_existing`; `alias` = tabla destino): `dim_fecha`, `dim_hora`, `dim_vehiculo`, `dim_remolque`, `dim_operador`, `dim_cliente`, `dim_ubicacion`, `dim_producto_sat`, `dim_poliza`, `dim_perfil_viaje`. `vars` nuevas en `dbt_project.yml`: `dim_fecha_inicio`/`dim_fecha_fin` y `dim_vehiculo_inicio_validez`.
+- **DIM_FECHA / DIM_HORA** (`protect_column` = `ID_FECHA` / `ID_HORA`; sin IDENTITY):
+  - `DIM_FECHA` 2026-01-01..2026-12-31 vía `CONNECT BY` → 365 días + fila `-1` = **366**.
+  - `DIM_HORA` 1,440 minutos + fila `-1` = **1,441**. `ID_HORA = 0` (00:00) es una fila válida distinta de `-1`.
+  - **Robustez NLS:** `NOMBRE_MES`/`NOMBRE_DIA` con `TO_CHAR(.., 'FMMonth'/'FMDay', 'NLS_DATE_LANGUAGE=SPANISH')` + `INITCAP`; `ES_FIN_SEMANA_FLAG` con `TO_CHAR(.., 'DY', 'NLS_DATE_LANGUAGE=ENGLISH') IN ('SAT','SUN')`; `DIA_SEMANA` ISO (1=lunes..7=domingo) calculado como `FECHA - TRUNC(FECHA,'IW') + 1` (no usa `'D'`); `SEMANA_ANIO` ISO (`IW`). Muestra verificada: 2026-02-07 → Sábado/6/'1'; 2026-02-09 → Lunes/1/'0'; 2026-08-09 → Domingo/7/'1'; 2026-12-31 → Jueves/4/'0'/semana 53.
+  - `DIM_HORA`: `HORA_12` 12 para 00:xx y 12:xx; `AM_PM` por `HORA_24 < 12`; `PERIODO_DIA` MADRUGADA (<6) / MAÑANA (<12) / TARDE (<19) / NOCHE.
+- **DIM_VEHICULO (A5, vigencia inicial uniforme):** `FECHA_EFECTIVA = TRUNC(UPDATED_AT)` de `CAT_VEHICULOS`; `initial_start_date = date '2026-08-09'` (var). Resultado: **100 unidades activas, todas con `FECHA_INICIO_VALIDEZ = 2026-08-09` y `FECHA_FIN_VALIDEZ = NULL`**, incluidas `ECO07` y `ECO42` (cuyo `UPDATED_AT` es octubre). 0 versiones cerradas, 0 inicios distintos de 2026-08-09 → en ST-9 ningún viaje de agosto/septiembre cae a `-1` por rango.
+- **DIM_PERFIL_VIAJE:** llave del MERGE = los 4 atributos (`UQ_DIM_PERFIL`). `ETAPA_VIAJE` derivada de `ESTATUS_DESPACHO` (A3): `CERRADO`→`CERRADO`, `EN_TRANSITO`→`TRANSITO`; resto por defecto del DDL (`DESTINO`/`COMPLETO`/`DESTINO`). Resultado: 2 perfiles reales (+ `-1`) = **3 filas**.
+- **Idempotencia:** `dbt run --select marts.dimensions` ejecutado 2 veces, 10/10 OK en ambas, conteos idénticos (consulta MCP `BI_READER` entre corridas).
+- **Conteos finales `DWH_MART` (MCP `BI_READER`, incluye la fila `-1`; las 10 dimensiones tienen exactamente una fila `-1`):**
+
+| Dimensión | Filas | Sin `-1` | Origen |
+|---|---|---|---|
+| DIM_FECHA | 366 | 365 | calendario 2026 |
+| DIM_HORA | 1,441 | 1,440 | minutos del día |
+| DIM_VEHICULO | 101 | 100 | `CAT_VEHICULOS` (100 activas) |
+| DIM_REMOLQUE | 101 | 100 | `CAT_REMOLQUES` |
+| DIM_OPERADOR | 16 | 15 | `CAT_OPERADORES` |
+| DIM_CLIENTE | 7 | 6 | `CAT_CLIENTES` |
+| DIM_UBICACION | 9 | 8 | `CAT_UBICACIONES` |
+| DIM_PRODUCTO_SAT | 4 | 3 | `SAT_PRODUCTO_SERVICIO` |
+| DIM_POLIZA | 11 | 10 | `CAT_POLIZAS_SEGURO` |
+| DIM_PERFIL_VIAJE | 3 | 2 | perfiles presentes |
+
+  Las 6 tablas de hechos siguen en 0 filas (no se escribió nada indebido en `DWH_MART`).
+- **Pruebas:** `_dimensions.yml` (`not_null`/`unique`/`accepted_values`/`unique_combination`) + singulares `marts_dim_fila_menos_uno` (la `-1` existe una vez y con valores dummy intactos en las 10 dimensiones), `marts_dim_conciliacion_edw` (EDW ↔ DWH sin `-1`, 365/1,440 filas de calendario, coherencia fin de semana/ID) y `marts_dim_vehiculo_vigencia` (1 activa por unidad, inicio uniforme, vigencias válidas). `dbt test --select marts` → **47/47**; `dbt test` completo → **250/250 PASS**, sin avisos de rutas sin uso.
+- **Comprobación aislada de `scd2_existing` (revertida):** copia de `DIM_VEHICULO` en `ETL_RUNNER.TMP_DIM_VEH` (tabla temporal, sin tocar `DWH_MART`), modelo temporal que simula `ECO15` con placa `TST9999` y fecha efectiva 2026-11-07. Resultado: `ECO15` queda con 2 versiones (v1 `98JM19` inicio 2026-08-09 fin **2026-11-06**, inactiva; v2 `TST9999` inicio 2026-11-07, activa), 100 activas en total y fila `-1` intacta; la segunda corrida sin cambios no abrió versiones nuevas (102 filas). La tabla y el modelo temporales se eliminaron y `git status` queda sin residuos.
+- **Observación:** `ETL_RUNNER` ya no tiene objetos temporales; la migración de `DIM_VEHICULO` a `FECHA_EFECTIVA` real para `ECO15` ocurrirá en ST-11 con el simulador en modo incremental.
 
 ---
 
