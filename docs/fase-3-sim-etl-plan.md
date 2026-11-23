@@ -468,7 +468,44 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `04_ddl_dwh_mart.sql` §3 (columnas, UQs, CHECKs), `.bob/skills/dbt-oracle-etl-pipeline/SKILL.md` pasos 5–6. Modo: `dw-architect-oracle`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-10; sin commit aún)
+
+#### Resultado ST-9
+
+- **Modelos** (`models/marts/facts/`, `+materialized: merge_existing`, `alias` = tabla destino): `fact_despacho_viaje`, `fact_eventos_parada`, `fact_lineas_carga_cartaporte`, `fact_facturacion_flete`, `fact_gastos_liquidacion`, `fact_snapshot_flota_diario`. Macros nuevas en `macros/marts_helpers.sql`: `etapa_viaje()` (fuente única de A3, reutilizada por `dim_perfil_viaje` y `fact_despacho_viaje`), `minutes_between()`, `vehiculo_asof_join()`, `dim_fecha_key()` y `dim_hora_key()` (todas las FKs salen con `NVL(..., -1)`).
+- **Precisión 1 — lookup point-in-time en `DIM_VEHICULO` (A5):** los 6 hechos resuelven `ID_VEHICULO` con `TRUNC(fecha_evento) BETWEEN FECHA_INICIO_VALIDEZ AND NVL(FECHA_FIN_VALIDEZ, DATE '2099-12-31') AND ID_VEHICULO <> -1` (no por `VERSION_ACTIVA`). Fecha del evento: despacho (despacho y facturación — la factura usa la fecha del servicio, no la de emisión), llegada real o programada (paradas), emisión del CCP (líneas) y liquidación (gastos). En `fact_snapshot_flota_diario` el universo es `DIM_FECHA × DIM_VEHICULO` con el mismo filtro de vigencia, de modo que una unidad con 2 versiones aporta exactamente 1 fila por día. Comprobación aislada (sin escribir en `DWH_MART`) simulando que `ECO15` abre v2 el 2026-11-07: **100 filas/día y 100 unidades distintas** del 2026-11-04 al 2026-11-10, con 1 fila de `ECO15` cada día.
+- **Precisión 2 — cero Fact-to-Fact y perfil:** ningún modelo `FACT_*` referencia a otro; todo se resuelve desde `EDW_3FN` y dimensiones (la facturación toma destino vía la Carta Porte del viaje en EDW; KMS/KWH del snapshot salen de `OP_FLOTA_ESTATUS_DIARIO`). El test `marts_sin_fact_a_fact` recorre el grafo de dbt y el código; **se validó que no es vacuo**: con un modelo temporal que unía dos hechos reportó 3 violaciones (modelo eliminado). `ID_PERFIL_VIAJE` usa la misma derivación `EN_TRANSITO → TRANSITO`, `CERRADO → CERRADO` de ST-8.
+- **Precisión 3a — paradas abiertas (H9):**
+  - `LAG_LLEGADA_MINUTOS` y `TIEMPO_ESTADIA_MINUTOS` se recalculan desde los timestamps de EDW (`minutes_between`); un test los concilia contra lo emitido por TrackIt (tolerancia 0.01 min): 0 diferencias.
+  - **Hallazgo:** `LAG_SALIDA_MINUTOS` **no es derivable** desde EDW: la salida programada no se persiste en STG (`FECHA_HORA_PROGRAMADA` es solo la llegada programada). Se conserva el valor de EDW (solo si hay salida real) y se documenta; el recálculo completo requeriría añadir `FECHA_HORA_SALIDA_PROGRAMADA` al DDL de `STG_SRC`/`EDW_3FN`, no hecho por estar fuera de alcance.
+  - Tolerancia de `CONTADOR_PUNTUAL`: `vars.puntualidad_tolerancia_minutos: 15` en `dbt_project.yml` (puntual si `LAG_LLEGADA <= 15`; los adelantos cuentan como puntuales).
+  - Manejo de nulos: ninguna columna `NOT NULL` se rompe. Parada `PENDIENTE` (14 filas: 3 `DESCARGA` y 11 `FIN VIAJE` de los viajes abiertos, según estatus en EDW) → fechas/horas de llegada y salida `-1`, métricas `0`, `CONTADOR_PARADA = 0` y `CONTADOR_PUNTUAL = 0`. Parada `EN_CURSO` (3 `DESCARGA`) → llegada real conocida, salida `-1`, `LAG_SALIDA = 0`, `ESTADIA = 0`, `CONTADOR_PARADA = 1`. Estos `-1` son **legítimos** ("evento aún no ocurrido"): el test `marts_fact_fk_menos_uno` exige que coincidan **exactamente** con las fechas nulas de EDW (ni falsos `-1` por lookup fallido, ni `-1` faltantes). En `FACT_DESPACHO_VIAJE`, los 11 viajes abiertos tienen `ID_FECHA_CIERRE = -1` y `CONTADOR_CERRADO = 0`.
+- **Precisión 3b — pivoteo de gastos (H5):** agrega por `(FOLIO_LIQ, TIPO_GASTO)` sumando `IMPORTE_GASTO` y pivota `CASETA`→`MONTO_CASETA`, `OPERADOR`→`MONTO_OPERADOR`, `MANTENIMIENTO`→`MONTO_MANTENIMIENTO`, `OTROS` y `COMBUSTIBLE_ENERGIA`→`MONTO_OTROS_GASTOS`. Se verificó previamente que los atributos del folio (talón, fecha, unidad, remolque, operador) son constantes por folio (0 inconsistentes).
+- **Idempotencia:** `dbt run --select marts.facts` ejecutado 2 veces, 6/6 OK en ambas; conteos y llaves distintas idénticos (0 duplicados) y verificados vía MCP `BI_READER`.
+- **Conteos finales `DWH_MART` (MCP `BI_READER`):**
+
+| Hecho | Filas | Llaves distintas | Referencia |
+|---|---|---|---|
+| FACT_DESPACHO_VIAJE | 5,040 | 5,040 | `OP_VIAJES_DESPACHO` (5,029 cerrados + 11 abiertos) |
+| FACT_EVENTOS_PARADA | 40,458 | 40,458 | `OP_VIAJES_PARADAS` (40,444 con `CONTADOR_PARADA = 1`) |
+| FACT_LINEAS_CARGA_CARTAPORTE | 15,236 | 15,236 | `FISCAL_CARTAPORTE_MERCANCIAS` (5,040 CCP) |
+| FACT_FACTURACION_FLETE | 5,029 | 5,029 | `FISCAL_CFDI_INGRESO` |
+| FACT_GASTOS_LIQUIDACION | 10,373 | 10,373 | pares `(folio, tipo)` de 22,511 líneas atómicas |
+| FACT_SNAPSHOT_FLOTA_DIARIO | 9,000 | 9,000 | 100 unidades × 90 días (2026-08-09 a 2026-11-06), 100 filas/día |
+
+- **Conciliación monetaria y de métricas (vía MCP y por test contra `EDW_3FN`, al centavo):**
+  - Facturación: `SUM(IMPORTE_TOTAL_FACTURADO)` = **309,227,803.56** = `SUM(SUBTOTAL − DESCUENTO + IVA_TRASLADADO − IVA_RETENIDO)`; 0 filas con descuadre fiscal.
+  - Gastos: `SUM(IMPORTE_GASTO)` = **17,855,296.07** = `SUM(MONTO_CASETA + MONTO_OPERADOR + MONTO_MANTENIMIENTO + MONTO_OTROS_GASTOS)`; 0 filas donde el pivote difiera del importe; conciliado también por cada tipo contra el detalle atómico.
+  - Operación: `KMS_TOTAL` despacho = `KMS_RECORRIDOS_DIA` snapshot = **1,820,487.49**; `KWH` despacho = `KWH_CONSUMO_DIA` snapshot = **326,806.52** (calculados de forma independiente, sin Fact-to-Fact); `PESO_KG` de líneas = `PESO_BRUTO_TOTAL_KG` de viajes = 93,612,287.19.
+  - Snapshot: 56.00 % con viaje / 40.00 % sin viaje / 4.00 % inactivas (A1); 0 unidades `SIN_REPORTE`; indicadores con suma = 1 en las 9,000 filas.
+  - Puntualidad global (tolerancia 15 min): 21,800 de 40,444 paradas ocurridas = 53.90 %.
+- **FKs en `-1`:** 0 en las FKs de dimensión de los 6 hechos (vehículo, remolque, operador, clientes, ubicaciones, producto, póliza, perfil, fecha/hora de inicio, emisión, facturación y liquidación). Los únicos `-1` son los legítimos de eventos no ocurridos: 11 `ID_FECHA_CIERRE` en despacho y 14 llegadas / 17 salidas en paradas (`PENDIENTE`/`EN_CURSO`).
+- **Pruebas:** `_facts.yml` (`not_null`, `unique`, `unique_combination`, `relationships` de cada FK, `accepted_values`) + singulares `marts_sin_fact_a_fact`, `marts_fact_fk_menos_uno`, `marts_fact_conciliacion_edw` (conteos de grano, montos, KMS/KWH, peso) y `marts_fact_metricas_y_vigencia` (métricas de paradas, snapshot por día, lookup point-in-time de los 5 hechos transaccionales). `dbt test` completo → **357/357 PASS**, 0 avisos.
+- **Observaciones para ST-10/ST-11:**
+  - Los 11 viajes abiertos (`EN_TRANSITO`) pertenecen al día 90 (2026-11-06); `FACT_DESPACHO_VIAJE` los carga con `CONTADOR_CERRADO = 0`. Cuando el modo incremental los cierre, el `MERGE` por `NUMERO_TALON` actualiza el hecho.
+  - `FACT_FACTURACION_FLETE` tiene fechas hasta 2026-11-09 (factura con rezago A4), todas dentro de `DIM_FECHA` (2026).
+  - `DISTANCIA_DECLARADA_KM` se repite por partida de un mismo CCP (según DDL): no sumar entre partidas.
+  - `FACT_SNAPSHOT_FLOTA_DIARIO` es un snapshot acumulativo por `MERGE` por `(fecha, vehículo)`: si `ECO15` abre v2 en ST-11, los días ≥ 2026-11-07 se generan con la nueva `ID_VEHICULO` y los anteriores conservan la v1 (filas históricas no se reescriben).
 
 ---
 
