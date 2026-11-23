@@ -127,3 +127,4 @@ trip_model:
 scd2_events:
   - { eco: "ECO07", effective_date: "2026-10-01", change: "PLACA" }
   - { eco: "ECO42", effective_date: "2026-10-20", change: "PLACA" }
+  - { eco: "ECO15", effective_date: "2026-11-07", change: "PLACA" }
