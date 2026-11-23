@@ -174,7 +174,32 @@ Pilares de la solución:
 3. Documentar los resultados numéricos en el reporte final de cierre.
 
 **Relevant Context:** `oracle/ddl/05_views_bi_semantic.sql`, `docs/fase-3-sim-etl-plan.md` (sección DoD y resultados de validación).  
-**Status:** `[ ] pending`
+**Status:** `[x] done` (`tests/test_superset_kpi_reconciliation.py`: **8/8 grupos PASS, 259 aserciones**; renderiza los 8 datasets reales de `superset/assets/datasets/` con Jinja y los ejecuta vía `BI_READER` en Thin Mode [`BI_READER_PWD` desde el entorno, consultas independientes con bind variables sobre `DWH_MART`/`BI_SEMANTIC` y las MVs]. Ver "Resultados de ST-5" abajo.)
+
+#### Resultados de ST-5 (conciliación contra el DW real)
+
+**Ejecución** (standalone y compatible con pytest; `tools/` y `tests/` no se montan en el contenedor):
+```
+docker exec tms-superset-app mkdir -p /tmp/tests
+docker cp tests/test_superset_kpi_reconciliation.py tms-superset-app:/tmp/tests/
+docker exec tms-superset-app python /tmp/tests/test_superset_kpi_reconciliation.py -v
+```
+
+| Ventana | Aserciones | Resultado clave |
+|---|---|---|
+| Conexión Thin / `BI_READER` | 11 | `is_thin_mode()==True`, credenciales solo desde el entorno |
+| Corte diario 2026-11-06 | 48 | 100 unidades (56/40/4 = 56 %/40 %/4 %), 56 viajes cerrados, 20,993.45 km, 4,243.31 kWh (4.95 km/kWh), facturación del día **$4,436,321.95** (ds_03 = ds_05 = ds_06 = independiente) |
+| Mes 2026-11-01..11-06 | 54 | 336 viajes cerrados, 123,731.53 km, 23,023.99 kWh (5.37 km/kWh), facturación **$21,017,482.18** (339 facturas), gastos **$1,199,481.00**; ds_06 = ds_07 al centavo; ds_06/ds_07 conciliados fila por fila contra consulta independiente |
+| 98 vs 99 unidades (mes) | 10 | ds_05 = 98 (solo con facturación); ds_06 = 99 (con actividad). Diferencia = **ECO97** (2 viajes 11-04/11-05, su única factura es del 11-07); ECO22 sin actividad |
+| Acumulado 90 días (..11-06) | 28 | 5,040 viajes cerrados, 1,825,987.38 km, 327,786.44 kWh (5.57 km/kWh), facturación **$305,177,133.26**, gastos **$17,908,049.79**; ds_06 = ds_07 |
+| 91 días vs `MV_PRODUCTIVIDAD_ECO_MENSUAL` | 40 | **$310,348,743.81** y **1,827,114.49 km** (ds_06 = ds_07 = MV), 327,999.20 kWh, gastos $17,918,678.54, 5,045 viajes (5,043 cerrados), MV de 399 filas / 100 unidades; ds_01 = `MV_METRICAS_FLOTA_DIARIA` en los 91 días |
+| Día 91 (2026-11-07) | 41 | 5 viajes (ECO48/51/55/64/84): 3 cerrados + 2 abiertos (`CONTADOR_CERRADO = 0`, los únicos del DW); flota 5/91/4; 1,127.11 km; ECO15 consolidado en **1 fila** en ds_05/ds_06 (carga completa: 54 viajes, 16,515.83 km, $2,813,957.49 = suma de ambas versiones SCD2) |
+| `DISTANCIA_DECLARADA_KM` | 27 | Colapsada a nivel `UUID_CCP` en ds_06/ds_07/ds_08 (mes 123,731.53; 90 d 1,825,987.38; 91 d 1,828,079.52). La suma naive por mercancía inflaría ×2.93–×3.02 (p. ej. 5,527,375.88 en 91 d). 0 CCP con distancias distintas entre mercancías (4,075 CCP multilínea) |
+
+**Reconciliación de cifras de línea base (discrepancias explicadas):**
+1. Las cifras de Fase 3 / plan original (**$309,227,803.56**, gastos $17,855,296.07, 1,820,487.49 km, 5.68 km/kWh) son la línea base **antes de la corrida incremental del día 91**. Se reproducen exactamente con las primeras 5,029 facturas (`ID_FACT_FACTURACION`); las 14 facturas incrementales (+$1,120,940.25) llevan el total a $310,348,743.81. Con el DW actual, el corte 11-06 (90 días) da $305,177,133.26 porque las facturas con fecha 11-07..11-09 (39 filas) quedan fuera de la ventana. El 5.68 (promedio de filas MV) pasa a **5.67**; el rendimiento global ponderado (kms/kWh) es 5.57.
+2. El 11-06 hay **56 viajes** pero **68 CFDIs de ingreso** emitidos ese día (el plan decía "56 CFDIs"); son aserciones distintas.
+3. En el día 91 ECO15 no aparece en ds_06 (0 filas): su versión 2 (ID 241, placa 47LL35, `VERSION_ACTIVA='1'`) solo tiene snapshot el 11-07 y ningún viaje. La consolidación SCD2 se verifica con la carga completa y con ds_01 filtrado por ECO15 (1 unidad en 11-06 y 11-07).
 
 ---
 
@@ -210,7 +235,7 @@ Pilares de la solución:
 | **Bloque 3** | Indicadores Generales (Día / Mes) | `ds_03_generales_dia_mes.sql` | `VW_FACT_DESPACHO_VIAJE`, `VW_FACT_GASTOS_LIQUIDACION`, `VW_FACT_FACTURACION_FLETE` | Total Kms, Rendimiento Kms/kWh (`NULLIF`), Pago Casetas ($), Pago Operadores ($), Facturado ($) | **Día 2026-11-06:** ~20,993.45 Kms, rendimiento ~4.95 km/kWh. **Mes (01..06 Nov):** suma acumulada de kms, kwh, facturación y gastos reales del mes en `BI_SEMANTIC`. |
 | **Bloque 4** | Top 5 — Despachos / Cliente | `ds_04_top5_clientes.sql` | `VW_FACT_DESPACHO_VIAJE`, `VW_DIM_CLIENTE` | Ranking clientes por volumen de despachos (Día vs. Mes) usando `RAZON_SOCIAL` | Top 5 clientes reales del DW agrupados por `c.RAZON_SOCIAL` para el día 2026-11-06 y el mes acumulado. |
 | **Bloque 5** | Facturación por Unidad (Top 10) | `ds_05_facturacion_top10_eco.sql` | `VW_FACT_FACTURACION_FLETE`, `VW_DIM_VEHICULO` | Facturación mensual acumulada por vehículo consolidando SCD2 por `CODIGO_ECO` | Top 10 vehículos con mayor facturación en el mes; `ECO15` unificado en una sola barra si abarca el día 91. |
-| **Bloque 6** | Productividad de las Unidades (Mes) | `ds_06_productividad_unidades.sql` | `VW_FACT_DESPACHO_VIAJE`, `VW_FACT_LINEAS_CARGA_CARTAPORTE`, `VW_FACT_FACTURACION_FLETE`, `VW_FACT_GASTOS_LIQUIDACION`, `VW_DIM_VEHICULO` | 13 columnas: Unidad, Despachos, Cerrados, Kms Cargado, Kms Vacío, Kms Total, Facturación, Fact/Km, Rendimiento Kms/kWh, Costos (Operador, Mant., Otros, Total) | Consolidación por `CODIGO_ECO` de los 100 vehículos activos; suma de Facturación = `$309.2M` (90 días) o total mensual exacto; Kms = `1.82M` km (90 días); `DISTANCIA_DECLARADA_KM` no aditivo por CCP. |
+| **Bloque 6** | Productividad de las Unidades (Mes) | `ds_06_productividad_unidades.sql` | `VW_FACT_DESPACHO_VIAJE`, `VW_FACT_LINEAS_CARGA_CARTAPORTE`, `VW_FACT_FACTURACION_FLETE`, `VW_FACT_GASTOS_LIQUIDACION`, `VW_DIM_VEHICULO` | 13 columnas: Unidad, Despachos, Cerrados, Kms Cargado, Kms Vacío, Kms Total, Facturación, Fact/Km, Rendimiento Kms/kWh, Costos (Operador, Mant., Otros, Total) | Consolidación por `CODIGO_ECO` de los 100 vehículos activos; suma de Facturación = `$305.18M` (90 días, corte 11-06), `$310.35M` (91 días) o total mensual exacto (`$21.02M`); Kms = `1.83M` km (90/91 días); `DISTANCIA_DECLARADA_KM` no aditivo por CCP. |
 | **Bloque 7** | Productividad de los Operadores (Mes) | `ds_07_productividad_operadores.sql` | `VW_FACT_DESPACHO_VIAJE`, `VW_FACT_LINEAS_CARGA_CARTAPORTE`, `VW_FACT_FACTURACION_FLETE`, `VW_FACT_GASTOS_LIQUIDACION`, `VW_DIM_OPERADOR` | 13 columnas por Operador: Clave/Nombre (`NOMBRE_OPERADOR`), Despachos, Cerrados, Kms Cargado/Vacío/Total, Facturación, Fact/Km, Rendimiento Kms/kWh, Costos | Consolidación por operador sobre `VW_DIM_OPERADOR`; totales de facturación, kms y costos concilian con Bloque 6 al centavo. |
 
 ---
@@ -221,9 +246,9 @@ Pilares de la solución:
 2. **Filter Pushdown Jinja Verificado en Oracle SE2:** Los filtros de fecha y dimensiones se inyectan en cada CTE individual antes del `FULL OUTER JOIN`, verificado mediante `EXPLAIN PLAN` + `DBMS_XPLAN.DISPLAY` ejecutado en sesión estándar `BI_READER`.
 3. **Conformidad Kimball y Licenciamiento:** Cero joins directos Fact↔Fact en las consultas analíticas; cero opciones de pago de Oracle EE (sin particiones, sin query rewrite); uso exclusivo de Valkey 8 (`valkey/valkey:8-alpine`).
 4. **Conciliación Numérica contra Totales Reales de Fase 3:**
-   - Corte diario `2026-11-06`: 100 unidades (56% con viaje, 40% sin viaje, 4% inactivas), 56 viajes cerrados, 56 facturas.
-   - Mes cerrado `2026-11-01` a `2026-11-06`: viajes, kms, kwh, facturación y gastos concilian al 100% contra `DWH_MART` / `BI_SEMANTIC`.
-   - Acumulado 90 días: Facturación `$309,227,803.56`, Gastos `$17,855,296.07`, Kms `1,820,487.49`, Rendimiento `5.68 km/kWh`.
+   - Corte diario `2026-11-06`: 100 unidades (56% con viaje, 40% sin viaje, 4% inactivas), 56 viajes cerrados, 68 facturas / $4,436,321.95 (ST-5 ✔).
+   - Mes cerrado `2026-11-01` a `2026-11-06`: viajes, kms, kwh, facturación y gastos concilian al 100% contra `DWH_MART` / `BI_SEMANTIC` (ST-5 ✔).
+   - Acumulado 90 días con corte 11-06: Facturación `$305,177,133.26`, Gastos `$17,908,049.79`, Kms `1,825,987.38`, Rendimiento `5.57 km/kWh`. Carga completa (91 días): `$310,348,743.81`, `1,827,114.49` km. La línea base pre-incremental de Fase 3 (`$309,227,803.56`, `1,820,487.49` km, `5.68`) queda explicada en "Resultados de ST-5".
    - Aislamiento del día 91 parcial (`2026-11-07`): 5 viajes nuevos, `ECO15` unificado en una sola fila/barra sin duplicidad por SCD2.
 5. **Rendimiento:** Tiempo de respuesta p95 del dashboard $< 3$ segundos con la caché Valkey activa.
 6. **Entregables Versionados:**
