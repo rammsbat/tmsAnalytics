@@ -525,7 +525,37 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `.bob/skills/dbt-oracle-etl-pipeline/checklists/kimball_quality_screens.md`. Modo: `dw-architect-oracle`.
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-11; sin commit aún)
+
+#### Resultado ST-10
+
+- **Auditoría y cobertura completa de Kimball Quality Screens:** Se cruzaron todos los ítems de `.bob/skills/dbt-oracle-etl-pipeline/checklists/kimball_quality_screens.md` contra la suite dbt. Se ampliaron las restricciones `not_null` y `accepted_values` en `_facts.yml` (cubriendo todas las dimensiones degeneradas, métricas numéricas y contadores/indicadores unitarios de hechos) y se fortalecieron las pruebas singulares de conciliación y reglas de negocio.
+- **Suite de pruebas dbt:** **404 tests en verde (PASS=404/404, 0 WARN, 0 ERROR, 0 SKIP)** ejecutados en el contenedor `etl-runner` sobre Oracle Database (Thin Mode).
+  - Fuentes `STG_SRC` (`_sources.yml`): 69 tests.
+  - Modelos `staging` (`_staging.yml`): 31 tests.
+  - Modelos `edw_3fn` (`_edw_3fn.yml` + singulares): 108 tests.
+  - Capa dimensional `DWH_MART` (`_dimensions.yml` + singulares): 47 tests.
+  - Capa de hechos `DWH_MART` (`_facts.yml` + singulares): 149 tests.
+
+#### Tabla de Trazabilidad: Ítem del Checklist ↔ Test
+
+| Categoría | Ítem de `kimball_quality_screens.md` | Test(s) dbt Implementados | Resultado |
+|---|---|---|---|
+| **Column Screens** | `not_null` en SKs, llaves naturales y todas las FKs de hechos | Generic `not_null` en `_dimensions.yml` (10 SKs + llaves naturales) y `_facts.yml` (6 SKs + 37 FKs + llaves degeneradas) + `tests/marts_fact_fk_menos_uno.sql` | **PASS** |
+| **Column Screens** | `unique` en SKs y llaves naturales de dimensiones (versión activa en SCD2) | Generic `unique` en `_dimensions.yml` + `unique_combination` `[CODIGO_ECO, FECHA_INICIO_VALIDEZ]` + `tests/marts_dim_vehiculo_vigencia.sql` (`VERSION_ACTIVA = '1'`) | **PASS** |
+| **Column Screens** | Rango: `kms_total >= 0` | Singular `tests/marts_fact_conciliacion_edw.sql` (`RANGO: KMS_TOTAL, CARGADO, VACIO >= 0` en `FACT_DESPACHO_VIAJE` y `RANGO: KMS_RECORRIDOS_DIA >= 0` en `FACT_SNAPSHOT_FLOTA_DIARIO`) | **PASS** |
+| **Column Screens** | Rango: `peso_kg <= 35000` | Singular `tests/marts_fact_conciliacion_edw.sql` (`RANGO: PESO_KG lineas entre 0 y 35000` en `FACT_LINEAS_CARGA_CARTAPORTE` y `RANGO: PESO_BRUTO_TOTAL_KG viaje entre 0 y 35000` en `FACT_DESPACHO_VIAJE`) | **PASS** |
+| **Column Screens** | Rango: métricas de conteo (`contador_*`, `*_indicador`) ∈ {0, 1} | Generic `accepted_values` en `_facts.yml` para `CONTADOR_DESPACHO` (1), `CONTADOR_CERRADO` (0,1), `CONTADOR_PARADA` (0,1), `CONTADOR_PUNTUAL` (0,1), `CONTADOR_PARTIDA` (1), `CONTADOR_FACTURA` (1), `CONTADOR_LIQUIDACION` (1), `UNIDAD_CON_VIAJE_INDICADOR` (0,1), `UNIDAD_SIN_VIAJE_INDICADOR` (0,1), `UNIDAD_INACTIVA_INDICADOR` (0,1) y `FLOTA_TOTAL_INDICADOR` (1) | **PASS** |
+| **Structure Screens** | `relationships`: toda FK de los 6 hechos apunta a una dimensión existente | Generic `relationships` en `_facts.yml` (37 tests sobre las 6 tablas de hechos hacia `DIM_FECHA`, `DIM_HORA`, `DIM_VEHICULO`, `DIM_REMOLQUE`, `DIM_OPERADOR`, `DIM_CLIENTE`, `DIM_UBICACION`, `DIM_PRODUCTO_SAT`, `DIM_POLIZA`, `DIM_PERFIL_VIAJE`) | **PASS** |
+| **Structure Screens** | Las 10 dimensiones conformadas contienen la fila `-1` / `DESCONOCIDO` | Singular `tests/marts_dim_fila_menos_uno.sql` (valida la existencia de `-1` y atributos dummy exactos en las 10 dimensiones) | **PASS** |
+| **Structure Screens** | Cero FKs `NULL`; llaves faltantes resueltas a `-1` | Generic `not_null` en las 37 FKs en `_facts.yml` + singular `tests/marts_fact_fk_menos_uno.sql` (prohíbe FKs nulas y restringe `-1` a eventos no ocurridos) | **PASS** |
+| **Business Rule Screens** | `kms_cargado + kms_vacio = kms_total` en `FACT_DESPACHO_VIAJE` | Singular `tests/marts_fact_conciliacion_edw.sql` (`REGLA: KMS_CARGADO + KMS_VACIO = KMS_TOTAL`) | **PASS** |
+| **Business Rule Screens** | Conteo de viajes `EDW_3FN` = `FACT_DESPACHO_VIAJE` | Singular `tests/marts_fact_conciliacion_edw.sql` (`CONTEO despacho`: `OP_VIAJES_DESPACHO` = `FACT_DESPACHO_VIAJE` = 5,040) | **PASS** |
+| **Business Rule Screens** | `FACT_SNAPSHOT_FLOTA_DIARIO`: suma indicadores = `flota_total_indicador` (1) y total diario = 100 | Singular `tests/marts_fact_metricas_y_vigencia.sql` (`SNAPSHOT: dia con indicadores suma <> FLOTA_TOTAL_INDICADOR o FLOTA_TOTAL <> 1` = 0, `SNAPSHOT: dia sin 100 unidades (flota)` = 0, `SNAPSHOT: dia con unidades SIN_REPORTE` = 0) | **PASS** |
+| **Business Rule Screens** | Cero joins directos Fact ↔ Fact en modelos | Singular `tests/marts_sin_fact_a_fact.sql` (auditoría estática del grafo de dbt y código SQL compilado) | **PASS** |
+| **Business Rule Screens** | Conciliación `LAG_LLEGADA_MINUTOS` y `TIEMPO_ESTADIA_MINUTOS` recalculados vs. emitidos | Singular `tests/marts_fact_metricas_y_vigencia.sql` (`PARADAS: LAG_LLEGADA recalculado <> EDW` = 0, `PARADAS: TIEMPO_ESTADIA recalculado <> EDW` = 0; `LAG_SALIDA_MINUTOS` conservado y documentado) | **PASS** |
+| **Business Rule Screens** | Ningún hecho completado con `ID_FECHA = -1` (respetando `-1` legítimos de pendientes/en curso) | Singular `tests/marts_fact_fk_menos_uno.sql` (conciliado 1 a 1 contra nulabilidad en `EDW_3FN`) | **PASS** |
+| **Business Rule Screens** | Conciliación de importes `STG_CFDI_INGRESO` ↔ `FACT_FACTURACION_FLETE` y `STG_LIQUIDACIONES_GASTOS` ↔ `FACT_GASTOS_LIQUIDACION` | Singular `tests/marts_fact_conciliacion_edw.sql` (`MONTO facturado total (vs STG)` = $309,227,803.56; `MONTO gastos total (vs STG)` = $17,855,296.07) | **PASS** |
 
 ---
 
