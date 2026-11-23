@@ -938,16 +938,36 @@ ORDER BY
             "params": {
                 "viz_type": "echarts_timeseries_bar",
                 "datasource": "4__table",
-                "groupby": ["CLIENTE"],
+                "x_axis": "CLIENTE",
+                "time_grain_sqla": None,
                 "metrics": [
-                    {"expressionType": "SQL", "sqlExpression": "SUM(DESPACHOS_MES)", "label": "Despachos Mes"},
-                    {"expressionType": "SQL", "sqlExpression": "SUM(DESPACHOS_DIA)", "label": "Despachos Dia"}
+                    {
+                        "expressionType": "SIMPLE",
+                        "column": {"column_name": "DESPACHOS_MES", "type": "INT"},
+                        "aggregate": "SUM",
+                        "label": "Despachos Mes"
+                    },
+                    {
+                        "expressionType": "SIMPLE",
+                        "column": {"column_name": "DESPACHOS_DIA", "type": "INT"},
+                        "aggregate": "SUM",
+                        "label": "Despachos Dia"
+                    }
                 ],
-                "orderby": [[{"expressionType": "SQL", "sqlExpression": "SUM(DESPACHOS_MES)", "label": "Despachos Mes"}, False]],
+                "groupby": [],
+                "order_desc": True,
                 "row_limit": 5,
                 "orientation": "horizontal",
                 "show_legend": True,
-                "time_range": "2026-11-01 : 2026-11-06"
+                "color_scheme": "supersetColors",
+                "time_range": "2026-11-01 : 2026-11-06",
+                "adhoc_filters": [],
+                "x_axis_title": "Despachos",
+                "y_axis_title": "Cliente",
+                "x_axis_title_margin": 15,
+                "y_axis_title_margin": 15,
+                "rich_tooltip": True,
+                "tooltip_sort_by_metric": True
             }
         },
         {
@@ -957,15 +977,30 @@ ORDER BY
             "params": {
                 "viz_type": "echarts_timeseries_bar",
                 "datasource": "5__table",
-                "groupby": ["UNIDAD"],
+                "x_axis": "UNIDAD",
+                "time_grain_sqla": None,
                 "metrics": [
-                    {"expressionType": "SQL", "sqlExpression": "SUM(TOTAL_FACTURACION)", "label": "Total Facturacion"}
+                    {
+                        "expressionType": "SIMPLE",
+                        "column": {"column_name": "TOTAL_FACTURACION"},
+                        "aggregate": "SUM",
+                        "label": "Total Facturacion"
+                    }
                 ],
-                "orderby": [[{"expressionType": "SQL", "sqlExpression": "SUM(TOTAL_FACTURACION)", "label": "Total Facturacion"}, False]],
+                "groupby": [],
+                "order_desc": True,
                 "row_limit": 10,
                 "orientation": "horizontal",
                 "show_legend": False,
-                "time_range": "2026-11-01 : 2026-11-06"
+                "color_scheme": "supersetColors",
+                "time_range": "2026-11-01 : 2026-11-06",
+                "adhoc_filters": [],
+                "x_axis_title": "Facturacion ($)",
+                "y_axis_title": "Unidad (ECO)",
+                "x_axis_title_margin": 15,
+                "y_axis_title_margin": 15,
+                "rich_tooltip": True,
+                "tooltip_sort_by_metric": True
             }
         },
         {
@@ -1105,7 +1140,8 @@ ORDER BY
                 viz_type=spec["viz_type"],
                 datasource_type="table",
                 datasource_id=spec["datasource_id"],
-                params=json.dumps(spec["params"], ensure_ascii=False)
+                params=json.dumps(spec["params"], ensure_ascii=False),
+                query_context=None
             )
             db.session.add(slc)
             db.session.flush()
@@ -1230,14 +1266,14 @@ ORDER BY
                 "id": "CHART_B2",
                 "children": [],
                 "parents": ["ROOT_ID", "GRID_ID", "ROW_B2_B3"],
-                "meta": {"chartId": s6.id, "sliceName": s6.slice_name, "uuid": str(s6.uuid), "width": 6, "height": 45}
+                "meta": {"chartId": s6.id, "sliceName": s6.slice_name, "uuid": str(s6.uuid), "width": 6, "height": 26}
             },
             "CHART_B3": {
                 "type": "CHART",
                 "id": "CHART_B3",
                 "children": [],
                 "parents": ["ROOT_ID", "GRID_ID", "ROW_B2_B3"],
-                "meta": {"chartId": s7.id, "sliceName": s7.slice_name, "uuid": str(s7.uuid), "width": 6, "height": 45}
+                "meta": {"chartId": s7.id, "sliceName": s7.slice_name, "uuid": str(s7.uuid), "width": 6, "height": 26}
             },
             "ROW_B4_B5": {
                 "type": "ROW",
@@ -1343,14 +1379,8 @@ ORDER BY
                 "name": "Unidad (ECO)",
                 "filterType": "filter_select",
                 "targets": [
-                    {"datasetId": 1, "column": {"name": "ESTADO_FLOTA"}},
-                    {"datasetId": 2, "column": {"name": "UNIDAD"}},
-                    {"datasetId": 3, "column": {"name": "UNIDAD"}},
-                    {"datasetId": 4, "column": {"name": "UNIDAD"}},
-                    {"datasetId": 5, "column": {"name": "UNIDAD"}},
                     {"datasetId": 6, "column": {"name": "UNIDAD"}},
-                    {"datasetId": 7, "column": {"name": "UNIDAD"}},
-                    {"datasetId": 8, "column": {"name": "UNIDAD"}}
+                    {"datasetId": 5, "column": {"name": "UNIDAD"}}
                 ],
                 "defaultDataMask": {
                     "filterState": {},
@@ -1371,12 +1401,7 @@ ORDER BY
                 "name": "Operador",
                 "filterType": "filter_select",
                 "targets": [
-                    {"datasetId": 2, "column": {"name": "NOMBRE_OPERADOR"}},
-                    {"datasetId": 3, "column": {"name": "NOMBRE_OPERADOR"}},
-                    {"datasetId": 4, "column": {"name": "NOMBRE_OPERADOR"}},
-                    {"datasetId": 6, "column": {"name": "NOMBRE_OPERADOR"}},
-                    {"datasetId": 7, "column": {"name": "NOMBRE_OPERADOR"}},
-                    {"datasetId": 8, "column": {"name": "NOMBRE_OPERADOR"}}
+                    {"datasetId": 7, "column": {"name": "NOMBRE_OPERADOR"}}
                 ],
                 "defaultDataMask": {
                     "filterState": {},
@@ -1397,13 +1422,7 @@ ORDER BY
                 "name": "Cliente",
                 "filterType": "filter_select",
                 "targets": [
-                    {"datasetId": 2, "column": {"name": "CLIENTE"}},
-                    {"datasetId": 3, "column": {"name": "CLIENTE"}},
-                    {"datasetId": 4, "column": {"name": "CLIENTE"}},
-                    {"datasetId": 5, "column": {"name": "CLIENTE"}},
-                    {"datasetId": 6, "column": {"name": "CLIENTE"}},
-                    {"datasetId": 7, "column": {"name": "CLIENTE"}},
-                    {"datasetId": 8, "column": {"name": "CLIENTE"}}
+                    {"datasetId": 4, "column": {"name": "CLIENTE"}}
                 ],
                 "defaultDataMask": {
                     "filterState": {},

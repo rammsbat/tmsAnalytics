@@ -85,7 +85,7 @@ with app.app_context():
                     metric_def = params.get("metric")
                     query_obj["metrics"] = [metric_def] if metric_def else []
                 elif viz == "echarts_timeseries_bar":
-                    query_obj["columns"] = params.get("groupby", [])
+                    query_obj["columns"] = [params["x_axis"]] if "x_axis" in params else params.get("groupby", [])
                     query_obj["metrics"] = params.get("metrics", [])
                     if "orderby" in params:
                         query_obj["orderby"] = params["orderby"]
@@ -134,9 +134,37 @@ with app.app_context():
                     print(f"  [ERROR] {slc.slice_name:46} ({viz:22}) | Excepcion: {str(e)}")
                     all_passed = False
 
+        print("\n--- 7. Validación de Endpoints de Filtros Nativos (Select Options) ---")
+        filter_endpoints = [
+            {"name": "Filtro UNIDAD (ds_06)", "dataset_id": 6, "col": "UNIDAD", "min_rows": 90},
+            {"name": "Filtro NOMBRE_OPERADOR (ds_07)", "dataset_id": 7, "col": "NOMBRE_OPERADOR", "min_rows": 10},
+            {"name": "Filtro CLIENTE (ds_04)", "dataset_id": 4, "col": "CLIENTE", "min_rows": 5}
+        ]
+        for fe in filter_endpoints:
+            try:
+                qc = QueryContextFactory().create(
+                    datasource={"type": "table", "id": fe["dataset_id"]},
+                    queries=[{"columns": [fe["col"]], "row_limit": 1000}],
+                    result_type="full",
+                    force=True
+                )
+                payload = qc.get_payload()
+                q_res = payload["queries"][0]
+                status = q_res.get("status")
+                data = q_res.get("data", [])
+                if status == "success" and len(data) >= fe["min_rows"]:
+                    sample_vals = [d[fe["col"]] for d in data[:3]]
+                    print(f"  [PASS] {fe['name']:40} | Rows: {len(data):3} | Samples: {sample_vals}")
+                else:
+                    print(f"  [FAIL] {fe['name']:40} | Status: {status} | Rows: {len(data)}")
+                    all_passed = False
+            except Exception as e:
+                print(f"  [ERROR] {fe['name']:40} | Excepcion: {str(e)}")
+                all_passed = False
+
         print("\n==================================================================")
         if all_passed:
-            print("  RESULTADO: 100% de Charts y Escenarios validados exitosamente (PASS)")
+            print("  RESULTADO: 100% de Charts y Native Filters validados exitosamente (PASS)")
         else:
             print("  RESULTADO: Se detectaron fallos en la validación")
         print("==================================================================")
