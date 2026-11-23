@@ -203,6 +203,10 @@ services:
       ORACLE_SERVICE: FREEPDB1
       ETL_RUNNER_USER: ETL_RUNNER
       ETL_RUNNER_PWD: ${ETL_RUNNER_PWD}
+    # TEMPORAL (ST-6..ST-10): montaje del proyecto dbt para iterar sin rebuild.
+    # No tapa /app/profiles ni DBT_TARGET_PATH/DBT_LOG_PATH. Se retira en ST-11.
+    volumes:
+      - ./etl/dbt_tms:/app/dbt_tms:ro
     networks:
       - tms-internal-net
     depends_on:
