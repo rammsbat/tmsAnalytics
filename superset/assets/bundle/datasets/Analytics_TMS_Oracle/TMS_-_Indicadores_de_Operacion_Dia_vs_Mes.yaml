@@ -1,0 +1,255 @@
+table_name: TMS - Indicadores de Operacion (Dia vs Mes)
+main_dttm_col: null
+description: Despachos, cierres, liquidaciones, CFDIs de traslado y facturados en
+  dia de corte vs mes
+default_endpoint: null
+offset: 0
+cache_timeout: null
+catalog: null
+schema: BI_SEMANTIC
+sql: "-- =============================================================================\n\
+  -- Dataset   : ds_02_operacion_dia_mes.sql\n-- Prop\xF3sito : Bloque 2 \u2014 Indicadores\
+  \ de Operaci\xF3n (D\xEDa vs. Mes)\n-- Fuente    : docs/Draft-dashboard-TMS.pdf\
+  \ (Bloque 2) & draft_dashboard_kpis.md\n-- Patr\xF3n    : Una sola pasada por CTE\
+  \ (rango mes) + Agregaci\xF3n condicional para D\xEDa\n-- =============================================================================\n\
+  \n{% set from_date = from_dttm[:10] if from_dttm else '2026-11-01' %}\n{% set to_date\
+  \ = to_dttm[:10] if to_dttm else '2026-11-06' %}\n{% set ecos = filter_values('CODIGO_ECO')\
+  \ or filter_values('UNIDAD') %}\n{% set operadores = filter_values('NOMBRE_OPERADOR')\
+  \ or filter_values('OPERADOR') %}\n{% set clientes = filter_values('RAZON_SOCIAL')\
+  \ or filter_values('CLIENTE') %}\n\nWITH CTE_CORTE AS (\n    SELECT COALESCE(MAX(FECHA),\
+  \ DATE '2026-11-06') AS FECHA_CORTE\n    FROM BI_SEMANTIC.MV_METRICAS_FLOTA_DIARIA\n\
+  \    WHERE FECHA >= TO_DATE('{{ from_date }}', 'YYYY-MM-DD')\n      AND FECHA <=\
+  \ TO_DATE('{{ to_date }}', 'YYYY-MM-DD')\n),\nCTE_DESPACHOS AS (\n    SELECT\n \
+  \       1                                                                      \
+  \                                AS JOIN_KEY,\n        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE\
+  \ THEN d.CONTADOR_DESPACHO ELSE 0 END)                            AS DESPACHOS_DIA,\n\
+  \        SUM(d.CONTADOR_DESPACHO)                                              \
+  \                                 AS DESPACHOS_MES,\n        SUM(CASE WHEN f.FECHA\
+  \ = c.FECHA_CORTE THEN d.CONTADOR_CERRADO ELSE 0 END)                          \
+  \   AS CIERRES_DIA,\n        SUM(d.CONTADOR_CERRADO)                           \
+  \                                                     AS CIERRES_MES\n    FROM BI_SEMANTIC.VW_FACT_DESPACHO_VIAJE\
+  \ d\n    CROSS JOIN CTE_CORTE c\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f\n        ON\
+  \ d.ID_FECHA_INICIO = f.ID_FECHA\n    JOIN BI_SEMANTIC.VW_DIM_VEHICULO v\n     \
+  \   ON d.ID_VEHICULO = v.ID_VEHICULO\n    JOIN BI_SEMANTIC.VW_DIM_OPERADOR o\n \
+  \       ON d.ID_OPERADOR = o.ID_OPERADOR\n    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli\n\
+  \        ON d.ID_CLIENTE_ORIGEN = cli.ID_CLIENTE\n    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE,\
+  \ 'MM')\n      AND f.FECHA <= c.FECHA_CORTE\n      {% if ecos %}\n      AND v.CODIGO_ECO\
+  \ IN {{ ecos | where_in }}\n      {% endif %}\n      {% if operadores %}\n     \
+  \ AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}\n      {% endif %}\n    \
+  \  {% if clientes %}\n      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}\n\
+  \      {% endif %}\n),\nCTE_LIQUIDACIONES AS (\n    SELECT\n        1          \
+  \                                                                              \
+  \              AS JOIN_KEY,\n        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE AND g.MONTO_CASETA\
+  \ > 0 THEN g.CONTADOR_LIQUIDACION ELSE 0 END)   AS LIQ_CASETAS_DIA,\n        SUM(CASE\
+  \ WHEN g.MONTO_CASETA > 0 THEN g.CONTADOR_LIQUIDACION ELSE 0 END)              \
+  \                 AS LIQ_CASETAS_MES,\n        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE\
+  \ AND g.MONTO_OPERADOR > 0 THEN g.CONTADOR_LIQUIDACION ELSE 0 END) AS LIQ_OPERADOR_DIA,\n\
+  \        SUM(CASE WHEN g.MONTO_OPERADOR > 0 THEN g.CONTADOR_LIQUIDACION ELSE 0 END)\
+  \                             AS LIQ_OPERADOR_MES\n    FROM BI_SEMANTIC.VW_FACT_GASTOS_LIQUIDACION\
+  \ g\n    CROSS JOIN CTE_CORTE c\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f\n        ON\
+  \ g.ID_FECHA_LIQUIDACION = f.ID_FECHA\n    JOIN BI_SEMANTIC.VW_DIM_VEHICULO v\n\
+  \        ON g.ID_VEHICULO = v.ID_VEHICULO\n    JOIN BI_SEMANTIC.VW_DIM_OPERADOR\
+  \ o\n        ON g.ID_OPERADOR = o.ID_OPERADOR\n    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE,\
+  \ 'MM')\n      AND f.FECHA <= c.FECHA_CORTE\n      {% if ecos %}\n      AND v.CODIGO_ECO\
+  \ IN {{ ecos | where_in }}\n      {% endif %}\n      {% if operadores %}\n     \
+  \ AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}\n      {% endif %}\n),\n\
+  CTE_CARTAPORTE AS (\n    SELECT\n        1                                     \
+  \                                                                AS JOIN_KEY,\n\
+  \        COUNT(DISTINCT CASE WHEN f.FECHA = c.FECHA_CORTE THEN cp.UUID_CCP END)\
+  \                                AS CFDI_TRASLADO_DIA,\n        COUNT(DISTINCT cp.UUID_CCP)\
+  \                                                                           AS CFDI_TRASLADO_MES\n\
+  \    FROM BI_SEMANTIC.VW_FACT_LINEAS_CARGA_CARTAPORTE cp\n    CROSS JOIN CTE_CORTE\
+  \ c\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f\n        ON cp.ID_FECHA_EMISION = f.ID_FECHA\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_VEHICULO v\n        ON cp.ID_VEHICULO = v.ID_VEHICULO\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli\n        ON cp.ID_CLIENTE_REMITENTE = cli.ID_CLIENTE\n\
+  \    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE, 'MM')\n      AND f.FECHA <= c.FECHA_CORTE\n\
+  \      {% if ecos %}\n      AND v.CODIGO_ECO IN {{ ecos | where_in }}\n      {%\
+  \ endif %}\n      {% if clientes %}\n      AND cli.RAZON_SOCIAL IN {{ clientes |\
+  \ where_in }}\n      {% endif %}\n),\nCTE_FACTURACION AS (\n    SELECT\n       \
+  \ 1                                                                            \
+  \                               AS JOIN_KEY,\n        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE\
+  \ THEN fac.CONTADOR_FACTURA ELSE 0 END)                                AS FACTURADOS_DIA,\n\
+  \        SUM(fac.CONTADOR_FACTURA)                                             \
+  \                                   AS FACTURADOS_MES\n    FROM BI_SEMANTIC.VW_FACT_FACTURACION_FLETE\
+  \ fac\n    CROSS JOIN CTE_CORTE c\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f\n       \
+  \ ON fac.ID_FECHA_FACTURACION = f.ID_FECHA\n    JOIN BI_SEMANTIC.VW_DIM_VEHICULO\
+  \ v\n        ON fac.ID_VEHICULO = v.ID_VEHICULO\n    JOIN BI_SEMANTIC.VW_DIM_CLIENTE\
+  \ cli\n        ON fac.ID_CLIENTE = cli.ID_CLIENTE\n    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE,\
+  \ 'MM')\n      AND f.FECHA <= c.FECHA_CORTE\n      {% if ecos %}\n      AND v.CODIGO_ECO\
+  \ IN {{ ecos | where_in }}\n      {% endif %}\n      {% if clientes %}\n      AND\
+  \ cli.RAZON_SOCIAL IN {{ clientes | where_in }}\n      {% endif %}\n)\nSELECT\n\
+  \    NVL(d.DESPACHOS_DIA, 0)     AS DESPACHOS_DIA,\n    NVL(d.DESPACHOS_MES, 0)\
+  \     AS DESPACHOS_MES,\n    NVL(d.CIERRES_DIA, 0)       AS CIERRES_DIA,\n    NVL(d.CIERRES_MES,\
+  \ 0)       AS CIERRES_MES,\n    NVL(l.LIQ_CASETAS_DIA, 0)   AS LIQ_CASETAS_DIA,\n\
+  \    NVL(l.LIQ_CASETAS_MES, 0)   AS LIQ_CASETAS_MES,\n    NVL(l.LIQ_OPERADOR_DIA,\
+  \ 0)  AS LIQ_OPERADOR_DIA,\n    NVL(l.LIQ_OPERADOR_MES, 0)  AS LIQ_OPERADOR_MES,\n\
+  \    NVL(cp.CFDI_TRASLADO_DIA, 0) AS CFDI_TRASLADO_DIA,\n    NVL(cp.CFDI_TRASLADO_MES,\
+  \ 0) AS CFDI_TRASLADO_MES,\n    NVL(fac.FACTURADOS_DIA, 0)   AS FACTURADOS_DIA,\n\
+  \    NVL(fac.FACTURADOS_MES, 0)   AS FACTURADOS_MES\nFROM CTE_DESPACHOS d\nJOIN\
+  \ CTE_LIQUIDACIONES l   ON d.JOIN_KEY = l.JOIN_KEY\nJOIN CTE_CARTAPORTE cp     ON\
+  \ d.JOIN_KEY = cp.JOIN_KEY\nJOIN CTE_FACTURACION fac   ON d.JOIN_KEY = fac.JOIN_KEY\n"
+params: null
+template_params: null
+filter_select_enabled: true
+fetch_values_predicate: null
+extra: null
+normalize_columns: false
+always_filter_main_dttm: false
+uuid: 27c757fe-5d9f-45ec-b038-9876fc33b9e2
+metrics:
+- metric_name: count
+  verbose_name: COUNT(*)
+  metric_type: count
+  expression: COUNT(*)
+  description: null
+  d3format: null
+  currency: null
+  extra: null
+  warning_text: null
+columns:
+- column_name: CFDI_TRASLADO_DIA
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: FACTURADOS_DIA
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LIQ_CASETAS_DIA
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: CFDI_TRASLADO_MES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: DESPACHOS_DIA
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: FACTURADOS_MES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LIQ_CASETAS_MES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LIQ_OPERADOR_DIA
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: DESPACHOS_MES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: CIERRES_DIA
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LIQ_OPERADOR_MES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: CIERRES_MES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+version: 1.0.0
+database_uuid: d51612fa-8fab-44cb-ba19-70527e558646

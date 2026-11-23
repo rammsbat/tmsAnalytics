@@ -1,0 +1,278 @@
+table_name: TMS - Analisis de Rutas y Corredores
+main_dttm_col: null
+description: Corredores de transporte interestatales con geolocalizacion, distancia
+  y peso promedio
+default_endpoint: null
+offset: 0
+cache_timeout: null
+catalog: null
+schema: BI_SEMANTIC
+sql: "-- =============================================================================\n\
+  -- Dataset   : ds_08_analisis_rutas_origen_destino.sql\n-- Prop\xF3sito : An\xE1\
+  lisis Geogr\xE1fico y Corredores Origen - Destino (Vistas de Rol)\n-- Fuente   \
+  \ : oracle/ddl/05_views_bi_semantic.sql (VW_FACT_LINEAS_CARGA_CARTAPORTE)\n-- =============================================================================\n\
+  \n{% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}\n{% set fecha_inicio\
+  \ = from_dttm[:10] if from_dttm else '2026-11-01' %}\n{% set ecos = filter_values('CODIGO_ECO')\
+  \ or filter_values('UNIDAD') %}\n{% set operadores = filter_values('NOMBRE_OPERADOR')\
+  \ or filter_values('OPERADOR') %}\n{% set clientes = filter_values('RAZON_SOCIAL')\
+  \ or filter_values('CLIENTE') %}\n\nWITH CTE_CCP_RUTAS AS (\n    SELECT\n      \
+  \  cp.UUID_CCP,\n        o.ESTADO_ORIGEN || ' -> ' || dst.ESTADO_DESTINO       \
+  \ AS CORREDOR_ESTADOS,\n        o.NOMBRE_UBICACION_ORIGEN                      \
+  \        AS ORIGEN,\n        o.MUNICIPIO_ORIGEN                                \
+  \     AS MUNICIPIO_ORIGEN,\n        o.ESTADO_ORIGEN                            \
+  \            AS ESTADO_ORIGEN,\n        o.LATITUD_ORIGEN                       \
+  \                AS LATITUD_ORIGEN,\n        o.LONGITUD_ORIGEN                 \
+  \                     AS LONGITUD_ORIGEN,\n        dst.NOMBRE_UBICACION_DESTINO\
+  \                           AS DESTINO,\n        dst.MUNICIPIO_DESTINO         \
+  \                         AS MUNICIPIO_DESTINO,\n        dst.ESTADO_DESTINO    \
+  \                                 AS ESTADO_DESTINO,\n        dst.LATITUD_DESTINO\
+  \                                    AS LATITUD_DESTINO,\n        dst.LONGITUD_DESTINO\
+  \                                   AS LONGITUD_DESTINO,\n        cli.RAZON_SOCIAL\
+  \                                       AS CLIENTE,\n        v.CODIGO_ECO      \
+  \                                     AS UNIDAD,\n        op.NOMBRE_OPERADOR   \
+  \                                  AS OPERADOR,\n        MAX(cp.DISTANCIA_DECLARADA_KM)\
+  \                         AS DISTANCIA_CCP,\n        SUM(cp.PESO_KG)           \
+  \                             AS PESO_TOTAL_CCP\n    FROM BI_SEMANTIC.VW_FACT_LINEAS_CARGA_CARTAPORTE\
+  \ cp\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f \n        ON cp.ID_FECHA_EMISION = f.ID_FECHA\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_UBICACION_ORIGEN o \n        ON cp.ID_ORIGEN_UBICACION\
+  \ = o.ID_ORIGEN_UBICACION\n    JOIN BI_SEMANTIC.VW_DIM_UBICACION_DESTINO dst \n\
+  \        ON cp.ID_DESTINO_UBICACION = dst.ID_DESTINO_UBICACION\n    JOIN BI_SEMANTIC.VW_DIM_CLIENTE\
+  \ cli \n        ON cp.ID_CLIENTE_REMITENTE = cli.ID_CLIENTE\n    JOIN BI_SEMANTIC.VW_DIM_VEHICULO\
+  \ v \n        ON cp.ID_VEHICULO = v.ID_VEHICULO\n    JOIN BI_SEMANTIC.VW_DIM_OPERADOR\
+  \ op \n        ON cp.ID_OPERADOR = op.ID_OPERADOR\n    WHERE f.FECHA >= TO_DATE('{{\
+  \ fecha_inicio }}', 'YYYY-MM-DD')\n      AND f.FECHA <= TO_DATE('{{ fecha_corte\
+  \ }}', 'YYYY-MM-DD')\n      AND o.ID_ORIGEN_UBICACION <> -1\n      AND dst.ID_DESTINO_UBICACION\
+  \ <> -1\n      {% if ecos %}\n      AND v.CODIGO_ECO IN {{ ecos | where_in }}\n\
+  \      {% endif %}\n      {% if operadores %}\n      AND op.NOMBRE_OPERADOR IN {{\
+  \ operadores | where_in }}\n      {% endif %}\n      {% if clientes %}\n      AND\
+  \ cli.RAZON_SOCIAL IN {{ clientes | where_in }}\n      {% endif %}\n    GROUP BY\n\
+  \        cp.UUID_CCP,\n        o.ESTADO_ORIGEN,\n        dst.ESTADO_DESTINO,\n \
+  \       o.NOMBRE_UBICACION_ORIGEN,\n        o.MUNICIPIO_ORIGEN,\n        o.LATITUD_ORIGEN,\n\
+  \        o.LONGITUD_ORIGEN,\n        dst.NOMBRE_UBICACION_DESTINO,\n        dst.MUNICIPIO_DESTINO,\n\
+  \        dst.ESTADO_DESTINO,\n        dst.LATITUD_DESTINO,\n        dst.LONGITUD_DESTINO,\n\
+  \        cli.RAZON_SOCIAL,\n        v.CODIGO_ECO,\n        op.NOMBRE_OPERADOR\n\
+  )\nSELECT\n    CORREDOR_ESTADOS,\n    ORIGEN,\n    MUNICIPIO_ORIGEN,\n    ESTADO_ORIGEN,\n\
+  \    LATITUD_ORIGEN,\n    LONGITUD_ORIGEN,\n    DESTINO,\n    MUNICIPIO_DESTINO,\n\
+  \    ESTADO_DESTINO,\n    LATITUD_DESTINO,\n    LONGITUD_DESTINO,\n    COUNT(UUID_CCP)\
+  \                                            AS TOTAL_EMBARQUES_CCP,\n    SUM(DISTANCIA_CCP)\
+  \                                         AS TOTAL_DISTANCIA_KM,\n    SUM(PESO_TOTAL_CCP)\
+  \                                        AS TOTAL_PESO_KG,\n    ROUND(AVG(DISTANCIA_CCP),\
+  \ 2)                               AS DISTANCIA_PROMEDIO_KM,\n    ROUND(AVG(PESO_TOTAL_CCP),\
+  \ 2)                              AS PESO_PROMEDIO_KG\nFROM CTE_CCP_RUTAS\nGROUP\
+  \ BY\n    CORREDOR_ESTADOS,\n    ORIGEN,\n    MUNICIPIO_ORIGEN,\n    ESTADO_ORIGEN,\n\
+  \    LATITUD_ORIGEN,\n    LONGITUD_ORIGEN,\n    DESTINO,\n    MUNICIPIO_DESTINO,\n\
+  \    ESTADO_DESTINO,\n    LATITUD_DESTINO,\n    LONGITUD_DESTINO\nORDER BY\n   \
+  \ TOTAL_EMBARQUES_CCP DESC\n"
+params: null
+template_params: null
+filter_select_enabled: true
+fetch_values_predicate: null
+extra: null
+normalize_columns: false
+always_filter_main_dttm: false
+uuid: b63abe66-41e7-4f25-8eb3-69947bcb4d5f
+metrics:
+- metric_name: count
+  verbose_name: COUNT(*)
+  metric_type: count
+  expression: COUNT(*)
+  description: null
+  d3format: null
+  currency: null
+  extra: null
+  warning_text: null
+columns:
+- column_name: TOTAL_EMBARQUES_CCP
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: CORREDOR_ESTADOS
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: ESTADO_DESTINO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: ESTADO_ORIGEN
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: MUNICIPIO_DESTINO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: MUNICIPIO_ORIGEN
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: DESTINO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: ORIGEN
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_DISTANCIA_KM
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: DISTANCIA_PROMEDIO_KM
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LATITUD_DESTINO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LATITUD_ORIGEN
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_PESO_KG
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LONGITUD_DESTINO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: PESO_PROMEDIO_KG
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: LONGITUD_ORIGEN
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+version: 1.0.0
+database_uuid: d51612fa-8fab-44cb-ba19-70527e558646

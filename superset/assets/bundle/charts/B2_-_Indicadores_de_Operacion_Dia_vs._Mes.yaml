@@ -1,0 +1,30 @@
+slice_name: B2 - Indicadores de Operacion (Dia vs. Mes)
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  viz_type: table
+  datasource: 13__table
+  all_columns:
+  - DESPACHOS_DIA
+  - DESPACHOS_MES
+  - CIERRES_DIA
+  - CIERRES_MES
+  - LIQ_CASETAS_DIA
+  - LIQ_CASETAS_MES
+  - LIQ_OPERADOR_DIA
+  - LIQ_OPERADOR_MES
+  - CFDI_TRASLADO_DIA
+  - CFDI_TRASLADO_MES
+  - FACTURADOS_DIA
+  - FACTURADOS_MES
+  query_mode: raw
+  row_limit: 100
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 2309f7d8-b5b9-49ee-be10-488697945195
+version: 1.0.0
+dataset_uuid: 27c757fe-5d9f-45ec-b038-9876fc33b9e2

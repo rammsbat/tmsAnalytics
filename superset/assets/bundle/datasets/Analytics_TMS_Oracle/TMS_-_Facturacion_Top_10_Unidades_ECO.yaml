@@ -1,0 +1,125 @@
+table_name: TMS - Facturacion Top 10 Unidades ECO
+main_dttm_col: null
+description: Top 10 unidades ECO con mayor facturacion mensual consolidando versiones
+  SCD2
+default_endpoint: null
+offset: 0
+cache_timeout: null
+catalog: null
+schema: BI_SEMANTIC
+sql: "-- =============================================================================\n\
+  -- Dataset   : ds_05_facturacion_top10_eco.sql\n-- Prop\xF3sito : Bloque 5 \u2014\
+  \ Facturaci\xF3n por Unidad (Top 10 del Mes)\n-- Fuente    : docs/Draft-dashboard-TMS.pdf\
+  \ (Bloque 5) & draft_dashboard_kpis.md\n-- SCD2      : Agrupaci\xF3n por llave natural\
+  \ CODIGO_ECO unificando versiones\n-- =============================================================================\n\
+  \n{% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}\n{% set fecha_inicio\
+  \ = from_dttm[:10] if from_dttm else '2026-11-01' %}\n{% set ecos = filter_values('CODIGO_ECO')\
+  \ or filter_values('UNIDAD') %}\n{% set clientes = filter_values('RAZON_SOCIAL')\
+  \ or filter_values('CLIENTE') %}\n\nSELECT\n    v.CODIGO_ECO                   \
+  \                            AS UNIDAD,\n    SUM(fac.IMPORTE_TOTAL_FACTURADO)  \
+  \                         AS TOTAL_FACTURACION,\n    SUM(fac.CONTADOR_FACTURA) \
+  \                                 AS TOTAL_FACTURAS,\n    SUM(fac.IMPORTE_SUBTOTAL)\
+  \                                  AS TOTAL_SUBTOTAL,\n    SUM(fac.IMPORTE_IVA_TRASLADADO)\
+  \                            AS TOTAL_IVA_TRASLADADO,\n    SUM(fac.IMPORTE_IVA_RETENIDO)\
+  \                              AS TOTAL_IVA_RETENIDO\nFROM BI_SEMANTIC.VW_FACT_FACTURACION_FLETE\
+  \ fac\nJOIN BI_SEMANTIC.VW_DIM_FECHA f \n    ON fac.ID_FECHA_FACTURACION = f.ID_FECHA\n\
+  JOIN BI_SEMANTIC.VW_DIM_VEHICULO v \n    ON fac.ID_VEHICULO = v.ID_VEHICULO\nJOIN\
+  \ BI_SEMANTIC.VW_DIM_CLIENTE cli \n    ON fac.ID_CLIENTE = cli.ID_CLIENTE\nWHERE\
+  \ f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')\n  AND f.FECHA <= TO_DATE('{{\
+  \ fecha_corte }}', 'YYYY-MM-DD')\n  AND v.ID_VEHICULO <> -1\n  {% if ecos %}\n \
+  \ AND v.CODIGO_ECO IN {{ ecos | where_in }}\n  {% endif %}\n  {% if clientes %}\n\
+  \  AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}\n  {% endif %}\nGROUP BY\n\
+  \    v.CODIGO_ECO\nORDER BY\n    TOTAL_FACTURACION DESC\n"
+params: null
+template_params: null
+filter_select_enabled: true
+fetch_values_predicate: null
+extra: null
+normalize_columns: false
+always_filter_main_dttm: false
+uuid: 90377112-2de4-4dd3-9160-bc3506b46698
+metrics:
+- metric_name: count
+  verbose_name: COUNT(*)
+  metric_type: count
+  expression: COUNT(*)
+  description: null
+  d3format: null
+  currency: null
+  extra: null
+  warning_text: null
+columns:
+- column_name: TOTAL_FACTURAS
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: UNIDAD
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_IVA_TRASLADADO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_FACTURACION
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_SUBTOTAL
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_IVA_RETENIDO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+version: 1.0.0
+database_uuid: d51612fa-8fab-44cb-ba19-70527e558646

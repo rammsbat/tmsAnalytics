@@ -1,0 +1,382 @@
+dashboard_title: Reporte Diario de Operacion - Analytics TMS
+description: null
+css: null
+slug: reporte-diario-operacion-tra099r1
+certified_by: null
+certification_details: null
+published: true
+uuid: be05b4dd-f3ad-4ef9-9191-7405cafa6e44
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    type: ROOT
+    id: ROOT_ID
+    children:
+    - GRID_ID
+  GRID_ID:
+    type: GRID
+    id: GRID_ID
+    children:
+    - HEADER_MAIN
+    - ROW_B1_KPIS
+    - ROW_B1_DONUT
+    - ROW_B2_B3
+    - ROW_B4_B5
+    - ROW_B6
+    - ROW_B7
+    - ROW_B8
+    parents:
+    - ROOT_ID
+    meta: {}
+  HEADER_MAIN:
+    type: HEADER
+    id: HEADER_MAIN
+    meta:
+      text: Reporte Diario de Operacion - Sunshine Deliveries (TRA099R1)
+    parents:
+    - ROOT_ID
+    - GRID_ID
+  ROW_B1_KPIS:
+    type: ROW
+    id: ROW_B1_KPIS
+    children:
+    - CHART_B1_1
+    - CHART_B1_2
+    - CHART_B1_3
+    - CHART_B1_4
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B1_1:
+    type: CHART
+    id: CHART_B1_1
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B1_KPIS
+    meta:
+      chartId: 69
+      sliceName: B1 - Flota Total
+      uuid: f0a0cf98-ba18-43c6-89d9-4058d8b518f6
+      width: 3
+      height: 26
+  CHART_B1_2:
+    type: CHART
+    id: CHART_B1_2
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B1_KPIS
+    meta:
+      chartId: 70
+      sliceName: B1 - Unidades Con Viaje
+      uuid: 2c4f1b6a-e6e9-4cf2-b6dc-4d3b65b47942
+      width: 3
+      height: 26
+  CHART_B1_3:
+    type: CHART
+    id: CHART_B1_3
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B1_KPIS
+    meta:
+      chartId: 72
+      sliceName: B1 - Unidades Sin Viaje
+      uuid: 155cc891-baf8-4e01-a929-c745a6660030
+      width: 3
+      height: 26
+  CHART_B1_4:
+    type: CHART
+    id: CHART_B1_4
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B1_KPIS
+    meta:
+      chartId: 71
+      sliceName: B1 - Unidades Inactivas
+      uuid: 301bd165-cd9d-4f4d-9077-985a7527734a
+      width: 3
+      height: 26
+  ROW_B1_DONUT:
+    type: ROW
+    id: ROW_B1_DONUT
+    children:
+    - CHART_B1_DONUT
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B1_DONUT:
+    type: CHART
+    id: CHART_B1_DONUT
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B1_DONUT
+    meta:
+      chartId: 68
+      sliceName: B1 - Disponibilidad de Flota (Dona)
+      uuid: 3444570c-8422-45dd-95b3-550c4d635b9c
+      width: 12
+      height: 38
+  ROW_B2_B3:
+    type: ROW
+    id: ROW_B2_B3
+    children:
+    - CHART_B2
+    - CHART_B3
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B2:
+    type: CHART
+    id: CHART_B2
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B2_B3
+    meta:
+      chartId: 73
+      sliceName: B2 - Indicadores de Operacion (Dia vs. Mes)
+      uuid: 2309f7d8-b5b9-49ee-be10-488697945195
+      width: 6
+      height: 26
+  CHART_B3:
+    type: CHART
+    id: CHART_B3
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B2_B3
+    meta:
+      chartId: 74
+      sliceName: B3 - Indicadores Generales (Dia vs. Mes)
+      uuid: 93e4a9d8-6604-4c87-a6f5-5e37089d5ab8
+      width: 6
+      height: 26
+  ROW_B4_B5:
+    type: ROW
+    id: ROW_B4_B5
+    children:
+    - CHART_B4
+    - CHART_B5
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B4:
+    type: CHART
+    id: CHART_B4
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B4_B5
+    meta:
+      chartId: 75
+      sliceName: B4 - Top 5 Despachos por Cliente (Barras)
+      uuid: be96534c-d76e-4410-bdf8-d8befcd121b0
+      width: 6
+      height: 50
+  CHART_B5:
+    type: CHART
+    id: CHART_B5
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B4_B5
+    meta:
+      chartId: 76
+      sliceName: B5 - Top 10 Facturacion por Unidad ECO (Barras)
+      uuid: 8cdebb83-3880-4bcd-9d29-c57f110db0be
+      width: 6
+      height: 50
+  ROW_B6:
+    type: ROW
+    id: ROW_B6
+    children:
+    - CHART_B6
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B6:
+    type: CHART
+    id: CHART_B6
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B6
+    meta:
+      chartId: 77
+      sliceName: B6 - Productividad de las Unidades (Mes)
+      uuid: 7632cec0-574e-4e5a-87dc-d4604812acff
+      width: 12
+      height: 70
+  ROW_B7:
+    type: ROW
+    id: ROW_B7
+    children:
+    - CHART_B7
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B7:
+    type: CHART
+    id: CHART_B7
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B7
+    meta:
+      chartId: 78
+      sliceName: B7 - Productividad de los Operadores (Mes)
+      uuid: 5b627a05-c8bf-4fb3-a095-edf3544fdfaf
+      width: 12
+      height: 70
+  ROW_B8:
+    type: ROW
+    id: ROW_B8
+    children:
+    - CHART_B8
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART_B8:
+    type: CHART
+    id: CHART_B8
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW_B8
+    meta:
+      chartId: 79
+      sliceName: B8 - Analisis de Corredores Origen-Destino
+      uuid: 7fcacef8-7f38-4bc3-b3d8-990e60263892
+      width: 12
+      height: 60
+metadata:
+  native_filter_configuration:
+  - id: NATIVE_FILTER-time-range
+    name: Rango Temporal
+    filterType: filter_time
+    targets:
+    - datasetUuid: 40d26e17-6d6c-4ab8-ad94-2728fecfe0a3
+    - datasetUuid: 27c757fe-5d9f-45ec-b038-9876fc33b9e2
+    - datasetUuid: da32ac3a-875b-472d-b9d0-45f47330b2ff
+    - datasetUuid: 190bdc80-2766-4955-8e02-74662a6bd5fd
+    - datasetUuid: 90377112-2de4-4dd3-9160-bc3506b46698
+    - datasetUuid: 535927c0-e561-4a1a-b3a4-48762bc8ecfd
+    - datasetUuid: 3a4b7464-1dc1-4db5-ab16-fd359a4c853d
+    - datasetUuid: b63abe66-41e7-4f25-8eb3-69947bcb4d5f
+    defaultDataMask:
+      filterState:
+        value: '2026-11-01 : 2026-11-06'
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    isInstant: true
+  - id: NATIVE_FILTER-codigo-eco
+    name: Unidad (ECO)
+    filterType: filter_select
+    targets:
+    - column:
+        name: UNIDAD
+      datasetUuid: 535927c0-e561-4a1a-b3a4-48762bc8ecfd
+    - column:
+        name: UNIDAD
+      datasetUuid: 90377112-2de4-4dd3-9160-bc3506b46698
+    defaultDataMask:
+      filterState: {}
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    isInstant: true
+    controlValues:
+      multiSelect: true
+      enableEmptyFilter: false
+      inverseSelection: false
+      defaultToFirstItem: false
+  - id: NATIVE_FILTER-operador
+    name: Operador
+    filterType: filter_select
+    targets:
+    - column:
+        name: NOMBRE_OPERADOR
+      datasetUuid: 3a4b7464-1dc1-4db5-ab16-fd359a4c853d
+    defaultDataMask:
+      filterState: {}
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    isInstant: true
+    controlValues:
+      multiSelect: true
+      enableEmptyFilter: false
+      inverseSelection: false
+      defaultToFirstItem: false
+  - id: NATIVE_FILTER-cliente
+    name: Cliente
+    filterType: filter_select
+    targets:
+    - column:
+        name: CLIENTE
+      datasetUuid: 190bdc80-2766-4955-8e02-74662a6bd5fd
+    defaultDataMask:
+      filterState: {}
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    isInstant: true
+    controlValues:
+      multiSelect: true
+      enableEmptyFilter: false
+      inverseSelection: false
+      defaultToFirstItem: false
+  chart_configuration: {}
+  global_chart_configuration:
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded: []
+    chartsInScope: []
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  expanded_slices: {}
+version: 1.0.0

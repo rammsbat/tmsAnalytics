@@ -1,0 +1,48 @@
+slice_name: B6 - Productividad de las Unidades (Mes)
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  viz_type: table
+  datasource: 14__table
+  all_columns:
+  - UNIDAD
+  - DESPACHOS_VIAJES
+  - CERRADOS
+  - KMS_CARGADO
+  - KMS_VACIO
+  - KMS_TOTAL
+  - TOTAL_FACTURACION
+  - COSTO_POR_KM
+  - RENDIMIENTO_PROM_KMS_KWH
+  - OPERADOR
+  - MANTENIMIENTO
+  - OTROS_GASTOS
+  - TOTAL_COSTO
+  column_config:
+    COSTO_POR_KM:
+      d3NumberFormat: $,.4f
+    TOTAL_FACTURACION:
+      d3NumberFormat: $,.2f
+    OPERADOR:
+      d3NumberFormat: $,.2f
+    MANTENIMIENTO:
+      d3NumberFormat: $,.2f
+    OTROS_GASTOS:
+      d3NumberFormat: $,.2f
+    TOTAL_COSTO:
+      d3NumberFormat: $,.2f
+    KMS_TOTAL:
+      d3NumberFormat: ',.2f'
+    RENDIMIENTO_PROM_KMS_KWH:
+      d3NumberFormat: ',.4f'
+  query_mode: raw
+  row_limit: 100
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 7632cec0-574e-4e5a-87dc-d4604812acff
+version: 1.0.0
+dataset_uuid: 535927c0-e561-4a1a-b3a4-48762bc8ecfd

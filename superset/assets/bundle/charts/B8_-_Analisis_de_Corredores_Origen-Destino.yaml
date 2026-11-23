@@ -1,0 +1,26 @@
+slice_name: B8 - Analisis de Corredores Origen-Destino
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  viz_type: table
+  datasource: 9__table
+  all_columns:
+  - CORREDOR_ESTADOS
+  - ORIGEN
+  - DESTINO
+  - TOTAL_EMBARQUES_CCP
+  - TOTAL_DISTANCIA_KM
+  - TOTAL_PESO_KG
+  - DISTANCIA_PROMEDIO_KM
+  - PESO_PROMEDIO_KG
+  query_mode: raw
+  row_limit: 20
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 7fcacef8-7f38-4bc3-b3d8-990e60263892
+version: 1.0.0
+dataset_uuid: b63abe66-41e7-4f25-8eb3-69947bcb4d5f

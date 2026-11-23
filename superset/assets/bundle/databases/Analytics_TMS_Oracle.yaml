@@ -1,0 +1,14 @@
+database_name: Analytics_TMS_Oracle
+sqlalchemy_uri: oracle+cx_oracle://BI_READER:${BI_READER_PWD}@oracle-dw:1521/?service_name=FREEPDB1
+cache_timeout: null
+expose_in_sqllab: true
+allow_run_async: true
+allow_ctas: false
+allow_cvas: false
+allow_dml: false
+allow_csv_upload: false
+extra:
+  engine_params:
+    arraysize: 1000
+uuid: d51612fa-8fab-44cb-ba19-70527e558646
+version: 1.0.0

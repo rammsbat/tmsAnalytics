@@ -1,0 +1,20 @@
+slice_name: B1 - Flota Total
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  viz_type: big_number_total
+  datasource: 11__table
+  metric:
+    expressionType: SQL
+    sqlExpression: SUM(CANTIDAD_UNIDADES)
+    label: Flota Total
+  subheader: 100 Unidades Activas
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: f0a0cf98-ba18-43c6-89d9-4058d8b518f6
+version: 1.0.0
+dataset_uuid: 40d26e17-6d6c-4ab8-ad94-2728fecfe0a3

@@ -1,0 +1,26 @@
+slice_name: B1 - Disponibilidad de Flota (Dona)
+description: null
+certified_by: null
+certification_details: null
+viz_type: pie
+params:
+  viz_type: pie
+  datasource: 11__table
+  groupby:
+  - ESTADO_FLOTA
+  metric:
+    expressionType: SQL
+    sqlExpression: SUM(CANTIDAD_UNIDADES)
+    label: Unidades
+  donut: true
+  show_labels: true
+  show_legend: true
+  color_scheme: supersetColors
+  row_limit: 10
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 3444570c-8422-45dd-95b3-550c4d635b9c
+version: 1.0.0
+dataset_uuid: 40d26e17-6d6c-4ab8-ad94-2728fecfe0a3

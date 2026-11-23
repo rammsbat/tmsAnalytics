@@ -1,0 +1,21 @@
+slice_name: B1 - Unidades Sin Viaje
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  viz_type: big_number_total
+  datasource: 11__table
+  metric:
+    expressionType: SQL
+    sqlExpression: SUM(CASE WHEN ESTADO_FLOTA = 'Sin Viaje' THEN CANTIDAD_UNIDADES
+      ELSE 0 END)
+    label: Sin Viaje
+  subheader: 40% de la Flota (40 uds)
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 155cc891-baf8-4e01-a929-c745a6660030
+version: 1.0.0
+dataset_uuid: 40d26e17-6d6c-4ab8-ad94-2728fecfe0a3

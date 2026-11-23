@@ -1,0 +1,36 @@
+slice_name: B5 - Top 10 Facturacion por Unidad ECO (Barras)
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_bar
+params:
+  viz_type: echarts_timeseries_bar
+  datasource: 10__table
+  x_axis: UNIDAD
+  time_grain_sqla: null
+  metrics:
+  - expressionType: SIMPLE
+    column:
+      column_name: TOTAL_FACTURACION
+    aggregate: SUM
+    label: Total Facturacion
+  groupby: []
+  order_desc: true
+  row_limit: 10
+  orientation: horizontal
+  show_legend: false
+  color_scheme: supersetColors
+  time_range: '2026-11-01 : 2026-11-06'
+  adhoc_filters: []
+  x_axis_title: Facturacion ($)
+  y_axis_title: Unidad (ECO)
+  x_axis_title_margin: 15
+  y_axis_title_margin: 15
+  rich_tooltip: true
+  tooltip_sort_by_metric: true
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 8cdebb83-3880-4bcd-9d29-c57f110db0be
+version: 1.0.0
+dataset_uuid: 90377112-2de4-4dd3-9160-bc3506b46698

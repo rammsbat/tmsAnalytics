@@ -1,0 +1,43 @@
+slice_name: B4 - Top 5 Despachos por Cliente (Barras)
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_bar
+params:
+  viz_type: echarts_timeseries_bar
+  datasource: 16__table
+  x_axis: CLIENTE
+  time_grain_sqla: null
+  metrics:
+  - expressionType: SIMPLE
+    column:
+      column_name: DESPACHOS_MES
+      type: INT
+    aggregate: SUM
+    label: Despachos Mes
+  - expressionType: SIMPLE
+    column:
+      column_name: DESPACHOS_DIA
+      type: INT
+    aggregate: SUM
+    label: Despachos Dia
+  groupby: []
+  order_desc: true
+  row_limit: 5
+  orientation: horizontal
+  show_legend: true
+  color_scheme: supersetColors
+  time_range: '2026-11-01 : 2026-11-06'
+  adhoc_filters: []
+  x_axis_title: Despachos
+  y_axis_title: Cliente
+  x_axis_title_margin: 15
+  y_axis_title_margin: 15
+  rich_tooltip: true
+  tooltip_sort_by_metric: true
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: be96534c-d76e-4410-bdf8-d8befcd121b0
+version: 1.0.0
+dataset_uuid: 190bdc80-2766-4955-8e02-74662a6bd5fd

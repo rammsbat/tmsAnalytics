@@ -1,0 +1,28 @@
+slice_name: B3 - Indicadores Generales (Dia vs. Mes)
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  viz_type: table
+  datasource: 12__table
+  all_columns:
+  - TOTAL_KMS_DIA
+  - TOTAL_KMS_MES
+  - RENDIMIENTO_KMS_KWH_DIA
+  - RENDIMIENTO_KMS_KWH_MES
+  - PAGO_CASETAS_DIA
+  - PAGO_CASETAS_MES
+  - PAGO_OPERADORES_DIA
+  - PAGO_OPERADORES_MES
+  - FACTURADO_DIA
+  - FACTURADO_MES
+  query_mode: raw
+  row_limit: 100
+  time_range: '2026-11-01 : 2026-11-06'
+  annotation_layers: []
+query_context: null
+cache_timeout: null
+uuid: 93e4a9d8-6604-4c87-a6f5-5e37089d5ab8
+version: 1.0.0
+dataset_uuid: da32ac3a-875b-472d-b9d0-45f47330b2ff

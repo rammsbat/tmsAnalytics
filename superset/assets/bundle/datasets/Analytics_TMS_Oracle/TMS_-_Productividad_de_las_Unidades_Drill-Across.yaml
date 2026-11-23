@@ -1,0 +1,327 @@
+table_name: TMS - Productividad de las Unidades (Drill-Across)
+main_dttm_col: null
+description: Matriz mensual de 13 columnas por unidad ECO con patron Drill-Across
+  (Despacho + Carga + Facturacion + Gastos)
+default_endpoint: null
+offset: 0
+cache_timeout: null
+catalog: null
+schema: BI_SEMANTIC
+sql: "-- =============================================================================\n\
+  -- Dataset   : ds_06_productividad_unidades.sql\n-- Prop\xF3sito : Bloque 6 \u2014\
+  \ Tabla de Productividad de las Unidades (Mes)\n-- Fuente    : docs/Draft-dashboard-TMS.pdf\
+  \ (Bloque 6) & draft_dashboard_kpis.md\n-- Patr\xF3n    : Drill-Across estricto\
+  \ (4 CTEs + FULL OUTER JOIN)\n-- SCD2      : Agrupaci\xF3n por llave natural CODIGO_ECO\n\
+  -- No Aditivo: DISTANCIA_DECLARADA_KM colapsada por UUID_CCP\n-- =============================================================================\n\
+  \n{% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}\n{% set fecha_inicio\
+  \ = from_dttm[:10] if from_dttm else '2026-11-01' %}\n{% set ecos = filter_values('CODIGO_ECO')\
+  \ or filter_values('UNIDAD') %}\n{% set operadores = filter_values('NOMBRE_OPERADOR')\
+  \ or filter_values('OPERADOR') %}\n{% set clientes = filter_values('RAZON_SOCIAL')\
+  \ or filter_values('CLIENTE') %}\n\nWITH CTE_DESPACHO AS (\n    SELECT\n       \
+  \ v.CODIGO_ECO,\n        COUNT(d.ID_FACT_DESPACHO)                             \
+  \     AS DESPACHOS_VIAJES,\n        SUM(d.CONTADOR_CERRADO)                    \
+  \                 AS CERRADOS,\n        SUM(d.KMS_CARGADO)                     \
+  \                     AS KMS_CARGADO,\n        SUM(d.KMS_VACIO)                \
+  \                            AS KMS_VACIO,\n        SUM(d.KMS_TOTAL)           \
+  \                                 AS KMS_TOTAL,\n        SUM(d.KWH_CONSUMO_ENERGIA)\
+  \                                  AS KWH_CONSUMO_TOTAL\n    FROM BI_SEMANTIC.VW_FACT_DESPACHO_VIAJE\
+  \ d\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f \n        ON d.ID_FECHA_INICIO = f.ID_FECHA\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_VEHICULO v \n        ON d.ID_VEHICULO = v.ID_VEHICULO\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_OPERADOR o \n        ON d.ID_OPERADOR = o.ID_OPERADOR\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli \n        ON d.ID_CLIENTE_ORIGEN = cli.ID_CLIENTE\n\
+  \    WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')\n      AND f.FECHA\
+  \ <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')\n      AND v.ID_VEHICULO <> -1\n\
+  \      {% if ecos %}\n      AND v.CODIGO_ECO IN {{ ecos | where_in }}\n      {%\
+  \ endif %}\n      {% if operadores %}\n      AND o.NOMBRE_OPERADOR IN {{ operadores\
+  \ | where_in }}\n      {% endif %}\n      {% if clientes %}\n      AND cli.RAZON_SOCIAL\
+  \ IN {{ clientes | where_in }}\n      {% endif %}\n    GROUP BY\n        v.CODIGO_ECO\n\
+  ),\nCTE_CARGA_CCP AS (\n    SELECT\n        cp.UUID_CCP,\n        v.CODIGO_ECO,\n\
+  \        MAX(cp.DISTANCIA_DECLARADA_KM)                             AS DISTANCIA_CCP,\n\
+  \        SUM(cp.PESO_KG)                                            AS PESO_TOTAL_CCP\n\
+  \    FROM BI_SEMANTIC.VW_FACT_LINEAS_CARGA_CARTAPORTE cp\n    JOIN BI_SEMANTIC.VW_DIM_FECHA\
+  \ f \n        ON cp.ID_FECHA_EMISION = f.ID_FECHA\n    JOIN BI_SEMANTIC.VW_DIM_VEHICULO\
+  \ v \n        ON cp.ID_VEHICULO = v.ID_VEHICULO\n    JOIN BI_SEMANTIC.VW_DIM_CLIENTE\
+  \ cli \n        ON cp.ID_CLIENTE_REMITENTE = cli.ID_CLIENTE\n    WHERE f.FECHA >=\
+  \ TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')\n      AND f.FECHA <= TO_DATE('{{\
+  \ fecha_corte }}', 'YYYY-MM-DD')\n      AND v.ID_VEHICULO <> -1\n      {% if ecos\
+  \ %}\n      AND v.CODIGO_ECO IN {{ ecos | where_in }}\n      {% endif %}\n     \
+  \ {% if clientes %}\n      AND cli.RAZON_SOCIAL IN {{ clientes | where_in }}\n \
+  \     {% endif %}\n    GROUP BY\n        cp.UUID_CCP,\n        v.CODIGO_ECO\n),\n\
+  CTE_CARGA AS (\n    SELECT\n        CODIGO_ECO,\n        SUM(DISTANCIA_CCP)    \
+  \                                     AS TOTAL_DISTANCIA_DECLARADA_KM,\n       \
+  \ SUM(PESO_TOTAL_CCP)                                        AS TOTAL_PESO_DECLARADO_KG\n\
+  \    FROM CTE_CARGA_CCP\n    GROUP BY\n        CODIGO_ECO\n),\nCTE_FACTURACION AS\
+  \ (\n    SELECT\n        v.CODIGO_ECO,\n        SUM(fac.IMPORTE_TOTAL_FACTURADO)\
+  \                           AS TOTAL_FACTURACION,\n        SUM(fac.CONTADOR_FACTURA)\
+  \                                  AS TOTAL_FACTURAS\n    FROM BI_SEMANTIC.VW_FACT_FACTURACION_FLETE\
+  \ fac\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f \n        ON fac.ID_FECHA_FACTURACION\
+  \ = f.ID_FECHA\n    JOIN BI_SEMANTIC.VW_DIM_VEHICULO v \n        ON fac.ID_VEHICULO\
+  \ = v.ID_VEHICULO\n    JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli \n        ON fac.ID_CLIENTE\
+  \ = cli.ID_CLIENTE\n    WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')\n\
+  \      AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')\n      AND v.ID_VEHICULO\
+  \ <> -1\n      {% if ecos %}\n      AND v.CODIGO_ECO IN {{ ecos | where_in }}\n\
+  \      {% endif %}\n      {% if clientes %}\n      AND cli.RAZON_SOCIAL IN {{ clientes\
+  \ | where_in }}\n      {% endif %}\n    GROUP BY\n        v.CODIGO_ECO\n),\nCTE_GASTOS\
+  \ AS (\n    SELECT\n        v.CODIGO_ECO,\n        SUM(g.MONTO_OPERADOR)       \
+  \                               AS COSTO_OPERADOR,\n        SUM(g.MONTO_MANTENIMIENTO)\
+  \                                 AS COSTO_MANTENIMIENTO,\n        SUM(g.MONTO_CASETA\
+  \ + g.MONTO_OTROS_GASTOS)                 AS OTROS_GASTOS,\n        SUM(g.IMPORTE_GASTO)\
+  \                                      AS TOTAL_COSTO\n    FROM BI_SEMANTIC.VW_FACT_GASTOS_LIQUIDACION\
+  \ g\n    JOIN BI_SEMANTIC.VW_DIM_FECHA f \n        ON g.ID_FECHA_LIQUIDACION = f.ID_FECHA\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_VEHICULO v \n        ON g.ID_VEHICULO = v.ID_VEHICULO\n\
+  \    JOIN BI_SEMANTIC.VW_DIM_OPERADOR o \n        ON g.ID_OPERADOR = o.ID_OPERADOR\n\
+  \    WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')\n      AND f.FECHA\
+  \ <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')\n      AND v.ID_VEHICULO <> -1\n\
+  \      {% if ecos %}\n      AND v.CODIGO_ECO IN {{ ecos | where_in }}\n      {%\
+  \ endif %}\n      {% if operadores %}\n      AND o.NOMBRE_OPERADOR IN {{ operadores\
+  \ | where_in }}\n      {% endif %}\n    GROUP BY\n        v.CODIGO_ECO\n),\nCTE_DRILLACROSS\
+  \ AS (\n    SELECT\n        COALESCE(d.CODIGO_ECO, cg.CODIGO_ECO, fac.CODIGO_ECO,\
+  \ g.CODIGO_ECO) AS CODIGO_ECO,\n        NVL(d.DESPACHOS_VIAJES, 0)             \
+  \                    AS DESPACHOS_VIAJES,\n        NVL(d.CERRADOS, 0)          \
+  \                               AS CERRADOS,\n        NVL(d.KMS_CARGADO, 0)    \
+  \                                  AS KMS_CARGADO,\n        NVL(d.KMS_VACIO, 0)\
+  \                                        AS KMS_VACIO,\n        NVL(d.KMS_TOTAL,\
+  \ 0)                                        AS KMS_TOTAL,\n        NVL(d.KWH_CONSUMO_TOTAL,\
+  \ 0)                                AS KWH_CONSUMO_TOTAL,\n        NVL(cg.TOTAL_DISTANCIA_DECLARADA_KM,\
+  \ 0)                    AS TOTAL_DISTANCIA_DECLARADA_KM,\n        NVL(cg.TOTAL_PESO_DECLARADO_KG,\
+  \ 0)                         AS TOTAL_PESO_DECLARADO_KG,\n        NVL(fac.TOTAL_FACTURACION,\
+  \ 0)                              AS TOTAL_FACTURACION,\n        NVL(fac.TOTAL_FACTURAS,\
+  \ 0)                                 AS TOTAL_FACTURAS,\n        NVL(g.COSTO_OPERADOR,\
+  \ 0)                                   AS COSTO_OPERADOR,\n        NVL(g.COSTO_MANTENIMIENTO,\
+  \ 0)                              AS COSTO_MANTENIMIENTO,\n        NVL(g.OTROS_GASTOS,\
+  \ 0)                                     AS OTROS_GASTOS,\n        NVL(g.TOTAL_COSTO,\
+  \ 0)                                      AS TOTAL_COSTO\n    FROM CTE_DESPACHO\
+  \ d\n    FULL OUTER JOIN CTE_CARGA cg\n        ON d.CODIGO_ECO = cg.CODIGO_ECO\n\
+  \    FULL OUTER JOIN CTE_FACTURACION fac\n        ON COALESCE(d.CODIGO_ECO, cg.CODIGO_ECO)\
+  \ = fac.CODIGO_ECO\n    FULL OUTER JOIN CTE_GASTOS g\n        ON COALESCE(d.CODIGO_ECO,\
+  \ cg.CODIGO_ECO, fac.CODIGO_ECO) = g.CODIGO_ECO\n)\nSELECT\n    da.CODIGO_ECO  \
+  \                                                AS UNIDAD,\n    da.DESPACHOS_VIAJES\
+  \                                            AS DESPACHOS_VIAJES,\n    da.CERRADOS\
+  \                                                    AS CERRADOS,\n    da.KMS_CARGADO\
+  \                                                 AS KMS_CARGADO,\n    da.KMS_VACIO\
+  \                                                   AS KMS_VACIO,\n    da.KMS_TOTAL\
+  \                                                   AS KMS_TOTAL,\n    da.TOTAL_FACTURACION\
+  \                                           AS TOTAL_FACTURACION,\n    ROUND(da.TOTAL_FACTURACION\
+  \ / NULLIF(da.KMS_TOTAL, 0), 4)       AS COSTO_POR_KM,\n    ROUND(da.KMS_TOTAL /\
+  \ NULLIF(da.KWH_CONSUMO_TOTAL, 0), 4)       AS RENDIMIENTO_PROM_KMS_KWH,\n    da.COSTO_OPERADOR\
+  \                                              AS OPERADOR,\n    da.COSTO_MANTENIMIENTO\
+  \                                         AS MANTENIMIENTO,\n    da.OTROS_GASTOS\
+  \                                                AS OTROS_GASTOS,\n    da.TOTAL_COSTO\
+  \                                                 AS TOTAL_COSTO,\n    da.TOTAL_FACTURACION\
+  \ - da.TOTAL_COSTO                          AS MARGEN_OPERATIVO,\n    da.TOTAL_DISTANCIA_DECLARADA_KM\
+  \                                AS DISTANCIA_DECLARADA_KM,\n    da.TOTAL_PESO_DECLARADO_KG\
+  \                                     AS PESO_DECLARADO_KG\nFROM CTE_DRILLACROSS\
+  \ da\nORDER BY\n    da.TOTAL_FACTURACION DESC,\n    da.KMS_TOTAL DESC\n"
+params: null
+template_params: null
+filter_select_enabled: true
+fetch_values_predicate: null
+extra: null
+normalize_columns: false
+always_filter_main_dttm: false
+uuid: 535927c0-e561-4a1a-b3a4-48762bc8ecfd
+metrics:
+- metric_name: count
+  verbose_name: COUNT(*)
+  metric_type: count
+  expression: COUNT(*)
+  description: null
+  d3format: null
+  currency: null
+  extra: null
+  warning_text: null
+columns:
+- column_name: DESPACHOS_VIAJES
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: CERRADOS
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: UNIDAD
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: STRING
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: MANTENIMIENTO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: INT
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: DISTANCIA_DECLARADA_KM
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_FACTURACION
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: PESO_DECLARADO_KG
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: KMS_CARGADO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: MARGEN_OPERATIVO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: KMS_VACIO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: TOTAL_COSTO
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: OPERADOR
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: OTROS_GASTOS
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: KMS_TOTAL
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: COSTO_POR_KM
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: RENDIMIENTO_PROM_KMS_KWH
+  verbose_name: null
+  is_dttm: false
+  is_active: true
+  type: null
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: ''
+  description: null
+  python_date_format: null
+  extra: null
+version: 1.0.0
+database_uuid: d51612fa-8fab-44cb-ba19-70527e558646
