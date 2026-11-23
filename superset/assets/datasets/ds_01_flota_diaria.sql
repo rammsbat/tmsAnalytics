@@ -6,12 +6,19 @@
 -- Filtro    : Día de corte (por defecto to_dttm o '2026-11-06')
 -- =============================================================================
 
-{% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
+{% set from_date = from_dttm[:10] if from_dttm else '2026-11-01' %}
+{% set to_date = to_dttm[:10] if to_dttm else '2026-11-06' %}
 {% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
 
+WITH CTE_CORTE AS (
+    SELECT COALESCE(MAX(FECHA), DATE '2026-11-06') AS FECHA_CORTE
+    FROM BI_SEMANTIC.MV_METRICAS_FLOTA_DIARIA
+    WHERE FECHA >= TO_DATE('{{ from_date }}', 'YYYY-MM-DD')
+      AND FECHA <= TO_DATE('{{ to_date }}', 'YYYY-MM-DD')
+)
 SELECT
     f.FECHA                                                    AS FECHA_CORTE,
-    CASE 
+    CASE
         WHEN s.UNIDAD_CON_VIAJE_INDICADOR = 1 THEN 'Con Viaje'
         WHEN s.UNIDAD_SIN_VIAJE_INDICADOR = 1 THEN 'Sin Viaje'
         ELSE 'Inactivas'
@@ -21,11 +28,12 @@ SELECT
     SUM(s.KMS_RECORRIDOS_DIA)                                  AS TOTAL_KMS_DIA,
     SUM(s.KWH_CONSUMO_DIA)                                     AS TOTAL_KWH_DIA
 FROM BI_SEMANTIC.VW_FACT_SNAPSHOT_FLOTA_DIARIO s
-JOIN BI_SEMANTIC.VW_DIM_FECHA f 
+CROSS JOIN CTE_CORTE c
+JOIN BI_SEMANTIC.VW_DIM_FECHA f
     ON s.ID_FECHA_CORTE = f.ID_FECHA
-JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
+JOIN BI_SEMANTIC.VW_DIM_VEHICULO v
     ON s.ID_VEHICULO = v.ID_VEHICULO
-WHERE f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
+WHERE f.FECHA = c.FECHA_CORTE
   AND s.ID_VEHICULO <> -1
   {% if ecos %}
   AND v.CODIGO_ECO IN {{ ecos | where_in }}

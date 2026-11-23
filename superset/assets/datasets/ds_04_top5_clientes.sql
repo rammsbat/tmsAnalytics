@@ -5,19 +5,27 @@
 -- Patrón    : Una sola pasada por CTE (rango mes) + Agregación condicional para Día
 -- =============================================================================
 
-{% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
+{% set from_date = from_dttm[:10] if from_dttm else '2026-11-01' %}
+{% set to_date = to_dttm[:10] if to_dttm else '2026-11-06' %}
 {% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
 {% set operadores = filter_values('NOMBRE_OPERADOR') or filter_values('OPERADOR') %}
 {% set clientes = filter_values('RAZON_SOCIAL') or filter_values('CLIENTE') %}
 
-WITH CTE_CLIENTES AS (
+WITH CTE_CORTE AS (
+    SELECT COALESCE(MAX(FECHA), DATE '2026-11-06') AS FECHA_CORTE
+    FROM BI_SEMANTIC.MV_METRICAS_FLOTA_DIARIA
+    WHERE FECHA >= TO_DATE('{{ from_date }}', 'YYYY-MM-DD')
+      AND FECHA <= TO_DATE('{{ to_date }}', 'YYYY-MM-DD')
+),
+CTE_CLIENTES AS (
     SELECT
         cli.RAZON_SOCIAL                                                                                       AS CLIENTE,
         cli.RFC_CLIENTE                                                                                        AS RFC,
-        SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN d.CONTADOR_DESPACHO ELSE 0 END) AS DESPACHOS_DIA,
+        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE THEN d.CONTADOR_DESPACHO ELSE 0 END)                            AS DESPACHOS_DIA,
         SUM(d.CONTADOR_DESPACHO)                                                                               AS DESPACHOS_MES,
         SUM(d.KMS_TOTAL)                                                                                       AS KMS_MES
     FROM BI_SEMANTIC.VW_FACT_DESPACHO_VIAJE d
+    CROSS JOIN CTE_CORTE c
     JOIN BI_SEMANTIC.VW_DIM_FECHA f 
         ON d.ID_FECHA_INICIO = f.ID_FECHA
     JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
@@ -26,8 +34,8 @@ WITH CTE_CLIENTES AS (
         ON d.ID_VEHICULO = v.ID_VEHICULO
     JOIN BI_SEMANTIC.VW_DIM_OPERADOR o 
         ON d.ID_OPERADOR = o.ID_OPERADOR
-    WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
-      AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
+    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE, 'MM')
+      AND f.FECHA <= c.FECHA_CORTE
       AND cli.ID_CLIENTE <> -1
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}

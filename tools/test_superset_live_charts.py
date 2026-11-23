@@ -65,6 +65,16 @@ with app.app_context():
                 "name": "6. Aislamiento Día 91 (2026-11-07)",
                 "time_range": "2026-11-07 : 2026-11-07",
                 "extra_filters": []
+            },
+            {
+                "name": "7. Rango Temporal Extendido (2026-10-01 : 2026-11-10)",
+                "time_range": "2026-10-01 : 2026-11-10",
+                "extra_filters": []
+            },
+            {
+                "name": "8. Rango Temporal Historico (2026-10-01 : 2026-10-16)",
+                "time_range": "2026-10-01 : 2026-10-16",
+                "extra_filters": []
             }
         ]
         

@@ -5,19 +5,27 @@
 -- Patrón    : Una sola pasada por CTE (rango mes) + Agregación condicional para Día
 -- =============================================================================
 
-{% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
+{% set from_date = from_dttm[:10] if from_dttm else '2026-11-01' %}
+{% set to_date = to_dttm[:10] if to_dttm else '2026-11-06' %}
 {% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
 {% set operadores = filter_values('NOMBRE_OPERADOR') or filter_values('OPERADOR') %}
 {% set clientes = filter_values('RAZON_SOCIAL') or filter_values('CLIENTE') %}
 
-WITH CTE_DESPACHOS_GEN AS (
+WITH CTE_CORTE AS (
+    SELECT COALESCE(MAX(FECHA), DATE '2026-11-06') AS FECHA_CORTE
+    FROM BI_SEMANTIC.MV_METRICAS_FLOTA_DIARIA
+    WHERE FECHA >= TO_DATE('{{ from_date }}', 'YYYY-MM-DD')
+      AND FECHA <= TO_DATE('{{ to_date }}', 'YYYY-MM-DD')
+),
+CTE_DESPACHOS_GEN AS (
     SELECT
         1                                                                                                          AS JOIN_KEY,
-        SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN d.KMS_TOTAL ELSE 0 END)           AS TOTAL_KMS_DIA,
+        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE THEN d.KMS_TOTAL ELSE 0 END)                                         AS TOTAL_KMS_DIA,
         SUM(d.KMS_TOTAL)                                                                                           AS TOTAL_KMS_MES,
-        SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN d.KWH_CONSUMO_ENERGIA ELSE 0 END) AS TOTAL_KWH_DIA,
+        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE THEN d.KWH_CONSUMO_ENERGIA ELSE 0 END)                               AS TOTAL_KWH_DIA,
         SUM(d.KWH_CONSUMO_ENERGIA)                                                                                AS TOTAL_KWH_MES
     FROM BI_SEMANTIC.VW_FACT_DESPACHO_VIAJE d
+    CROSS JOIN CTE_CORTE c
     JOIN BI_SEMANTIC.VW_DIM_FECHA f 
         ON d.ID_FECHA_INICIO = f.ID_FECHA
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
@@ -26,8 +34,8 @@ WITH CTE_DESPACHOS_GEN AS (
         ON d.ID_OPERADOR = o.ID_OPERADOR
     JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
         ON d.ID_CLIENTE_ORIGEN = cli.ID_CLIENTE
-    WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
-      AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
+    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE, 'MM')
+      AND f.FECHA <= c.FECHA_CORTE
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
@@ -41,19 +49,20 @@ WITH CTE_DESPACHOS_GEN AS (
 CTE_GASTOS_GEN AS (
     SELECT
         1                                                                                                      AS JOIN_KEY,
-        SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN g.MONTO_CASETA ELSE 0 END)   AS PAGO_CASETAS_DIA,
+        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE THEN g.MONTO_CASETA ELSE 0 END)                                  AS PAGO_CASETAS_DIA,
         SUM(g.MONTO_CASETA)                                                                                   AS PAGO_CASETAS_MES,
-        SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN g.MONTO_OPERADOR ELSE 0 END) AS PAGO_OPERADORES_DIA,
+        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE THEN g.MONTO_OPERADOR ELSE 0 END)                                AS PAGO_OPERADORES_DIA,
         SUM(g.MONTO_OPERADOR)                                                                                 AS PAGO_OPERADORES_MES
     FROM BI_SEMANTIC.VW_FACT_GASTOS_LIQUIDACION g
+    CROSS JOIN CTE_CORTE c
     JOIN BI_SEMANTIC.VW_DIM_FECHA f 
         ON g.ID_FECHA_LIQUIDACION = f.ID_FECHA
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON g.ID_VEHICULO = v.ID_VEHICULO
     JOIN BI_SEMANTIC.VW_DIM_OPERADOR o 
         ON g.ID_OPERADOR = o.ID_OPERADOR
-    WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
-      AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
+    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE, 'MM')
+      AND f.FECHA <= c.FECHA_CORTE
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
@@ -64,17 +73,18 @@ CTE_GASTOS_GEN AS (
 CTE_FACTURACION_GEN AS (
     SELECT
         1                                                                                                                 AS JOIN_KEY,
-        SUM(CASE WHEN f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD') THEN fac.IMPORTE_TOTAL_FACTURADO ELSE 0 END) AS FACTURADO_DIA,
+        SUM(CASE WHEN f.FECHA = c.FECHA_CORTE THEN fac.IMPORTE_TOTAL_FACTURADO ELSE 0 END)                               AS FACTURADO_DIA,
         SUM(fac.IMPORTE_TOTAL_FACTURADO)                                                                                AS FACTURADO_MES
     FROM BI_SEMANTIC.VW_FACT_FACTURACION_FLETE fac
+    CROSS JOIN CTE_CORTE c
     JOIN BI_SEMANTIC.VW_DIM_FECHA f 
         ON fac.ID_FECHA_FACTURACION = f.ID_FECHA
     JOIN BI_SEMANTIC.VW_DIM_VEHICULO v 
         ON fac.ID_VEHICULO = v.ID_VEHICULO
     JOIN BI_SEMANTIC.VW_DIM_CLIENTE cli 
         ON fac.ID_CLIENTE = cli.ID_CLIENTE
-    WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
-      AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
+    WHERE f.FECHA >= TRUNC(c.FECHA_CORTE, 'MM')
+      AND f.FECHA <= c.FECHA_CORTE
       {% if ecos %}
       AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
