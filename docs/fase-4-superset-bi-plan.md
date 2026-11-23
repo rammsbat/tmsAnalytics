@@ -136,8 +136,9 @@ Pilares de la solución:
 3. Auditar los archivos generados para confirmar Cero Secretos (Regla 03).
 4. Probar la re-importación en frío para verificar idempotencia y conservación de credenciales.
 
-**Relevant Context:** `.bob/rules/03-security-and-secrets.md`, `superset/bootstrap.sh`.  
-**Status:** `[ ] pending`
+**Relevant Context:** `.bob/rules/03-security-and-secrets.md`, `superset/bootstrap.sh`.
+**Entregables:** `tools/export_superset_assets.py`, `tools/import_superset_assets.py`, `tools/audit_superset_assets.py`, `superset/assets/bundle/` (23 archivos YAML) y `superset/assets/README.md` (flujo y nota `oracle+cx_oracle`).
+**Status:** `[x] done` (Bundle YAML de 23 archivos: 1 base, 8 datasets, 12 charts, 1 dashboard con 4 Native Filters y 7 filas de layout; auditoría de cero secretos PASS [placeholder `${BI_READER_PWD}`, sin máscara ni credenciales]; re-importación idempotente ×3 sin duplicados y con password cifrada intacta; restauración en frío [dashboard/charts/datasets borrados] + `test_superset_live_charts.py` 99/99 PASS en Thin Mode. La URI `oracle+cx_oracle://` es obligatoria en SQLAlchemy 1.4 y puentea a `python-oracledb`: falso positivo documentado para ST-6)
 
 ---
 
