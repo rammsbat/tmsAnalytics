@@ -357,7 +357,38 @@ Orden de construcción en dbt: seeds/catálogos → dimensiones (`DIM_FECHA`, `D
 
 **Relevant Context:** `03_ddl_edw_3fn.sql` (columnas, UQs, CHECKs como `CK_OP_FEST_STATUS`, `CK_OP_GASTO_TIPO`), `.bob/skills/dbt-oracle-etl-pipeline/SKILL.md` paso 3. Modo: `dw-architect-oracle` / `agent` (seeds CSV).
 
-**Status:** `[ ] pending`
+**Status:** `[x] done` (pendiente de aprobación del usuario para iniciar ST-8; sin commit aún)
+
+#### Resultado ST-7
+
+- **Seeds** (`etl/dbt_tms/seeds/`, esquema `ETL_RUNNER`, tipos en `_seeds.yml`): `seed_sat_unidad_medida` (3), `seed_sat_producto_servicio` (3), `seed_sat_config_autotransporte` (1), `seed_sat_tipo_permiso` (1), `seed_geo_ubicaciones` (8). Derivados 1 a 1 de `sat_catalogs` (`config_rules.yaml`).
+- **Materialización `merge_existing`** (`+materialized: merge_existing` en `edw_3fn`): nueva config opcional `protect_column`.
+  - Por defecto la columna protegida es la primera `IDENTITY` (`ALL_TAB_IDENTITY_COLS`) y el `UPDATE` incluye `where t.<ID> <> -1`.
+  - Sin `IDENTITY` y sin `protect_column` **no** se emite predicado alguno (caso `SAT_*`; en ST-8 `DIM_FECHA`/`DIM_HORA` usarán `protect_column=ID_FECHA/ID_HORA`). Un `protect_column` inexistente en el destino genera error de compilación.
+  - Evidencia SQL: `SAT_UNIDAD_MEDIDA` → `UPDATE` sin `where`, `UPDATED_AT = systimestamp`; `CAT_VEHICULOS` → `where t.ID_VEHICULO <> -1`, `UPDATED_AT = s.UPDATED_AT`, `INSERT` sin columna identity.
+- **17 modelos** en `models/edw_3fn/` (`alias` = tabla destino, `unique_key` = llave natural), orden de FK forzado con `ref()` + `-- depends_on:`: `SAT_UNIDAD_MEDIDA` → resto `SAT_*` → `CAT_*` → `OP_*` / `FISCAL_*`.
+- **Decisiones:**
+  - `CAT_VEHICULOS.UPDATED_AT = INGESTED_AT` de la versión vigente (no `SYSTIMESTAMP`) → ST-8 deriva `FECHA_EFECTIVA = TRUNC(UPDATED_AT)` (D6). Verificado: `ECO07` → 2026-10-01, `ECO42` → 2026-10-20, resto (98) → 2026-08-09.
+  - Cliente en `OP_VIAJES_DESPACHO` resuelto por `RAZON_SOCIAL` (único por cliente; `CLIENTE_ORIGEN/DESTINO` de TrackIt = `NOMBRE_REMITENTE/DESTINATARIO` de CCP en los 5,040 viajes).
+  - `OP_LIQUIDACIONES_GASTOS`: llave MERGE `(FOLIO_LIQUIDACION, TIPO_GASTO, REFERENCIA_COMPROBANTE)` (H5).
+- **Gotcha:** `Set-Content -Encoding utf8` (PowerShell 5.1) escribe BOM y provoca `ORA-00911` en modelos; escribir archivos sin BOM.
+- **Conteos tras `dbt run --select edw_3fn` (ejecutado 2 veces, 17/17 OK en ambas, conteos idénticos, 0 duplicados):**
+
+| Tabla EDW_3FN | Filas | Referencia STG |
+|---|---|---|
+| SAT_UNIDAD_MEDIDA / SAT_PRODUCTO_SERVICIO / SAT_CONFIG_AUTOTRANSPORTE / SAT_TIPO_PERMISO | 3 / 3 / 1 / 1 | seeds |
+| CAT_POLIZAS_SEGURO / CAT_CLIENTES / CAT_OPERADORES / CAT_UBICACIONES | 10 / 6 / 15 / 8 | distintos en STG |
+| CAT_REMOLQUES / CAT_VEHICULOS | 100 / 100 | 102 filas STG → 100 tras dedupe |
+| OP_VIAJES_DESPACHO | 5,040 | STG_TRACKIT_DESPACHO 5,040 |
+| OP_VIAJES_PARADAS | 40,458 | STG_TRACKIT_PARADAS 40,458 |
+| OP_FLOTA_ESTATUS_DIARIO | 9,000 | STG_FLOTA_ESTATUS_DIARIO 9,000 |
+| FISCAL_CFDI_CARTAPORTE | 5,040 | STG_CARTA_PORTE_CABECERA 5,040 |
+| FISCAL_CARTAPORTE_MERCANCIAS | 15,236 | STG_CARTA_PORTE_MERCANCIAS 15,236 |
+| FISCAL_CFDI_INGRESO | 5,029 | STG_CFDI_INGRESO 5,029 |
+| OP_LIQUIDACIONES_GASTOS | 22,511 | STG_LIQUIDACIONES_GASTOS 22,511 |
+
+- **Pruebas:** `models/edw_3fn/_edw_3fn.yml` (`not_null`, `unique`, `relationships`, `unique_combination`) + singulares `edw_3fn_conciliacion_stg.sql` (conteos STG ↔ EDW) y `edw_3fn_ubicaciones_sin_geografia.sql`. `dbt test --select edw_3fn` → **PASS=103/103** (203 tests en el proyecto).
+- **Observación:** el aviso de rutas sin uso queda solo para `models.tms_dbt.marts` (se resolverá en ST-8).
 
 ---
 
