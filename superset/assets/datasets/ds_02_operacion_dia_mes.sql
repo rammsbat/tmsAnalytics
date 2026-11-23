@@ -6,6 +6,9 @@
 -- =============================================================================
 
 {% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
+{% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
+{% set operadores = filter_values('NOMBRE_OPERADOR') or filter_values('OPERADOR') %}
+{% set clientes = filter_values('RAZON_SOCIAL') or filter_values('CLIENTE') %}
 
 WITH CTE_DESPACHOS AS (
     SELECT
@@ -25,14 +28,14 @@ WITH CTE_DESPACHOS AS (
         ON d.ID_CLIENTE_ORIGEN = c.ID_CLIENTE
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('NOMBRE_OPERADOR') %}
-      AND o.NOMBRE_OPERADOR IN {{ filter_values('NOMBRE_OPERADOR') | where_in }}
+      {% if operadores %}
+      AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
-      {% if filter_values('RAZON_SOCIAL') %}
-      AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+      {% if clientes %}
+      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
 ),
 CTE_LIQUIDACIONES AS (
@@ -51,11 +54,11 @@ CTE_LIQUIDACIONES AS (
         ON g.ID_OPERADOR = o.ID_OPERADOR
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('NOMBRE_OPERADOR') %}
-      AND o.NOMBRE_OPERADOR IN {{ filter_values('NOMBRE_OPERADOR') | where_in }}
+      {% if operadores %}
+      AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
 ),
 CTE_CARTAPORTE AS (
@@ -72,11 +75,11 @@ CTE_CARTAPORTE AS (
         ON cp.ID_CLIENTE_REMITENTE = c.ID_CLIENTE
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('RAZON_SOCIAL') %}
-      AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+      {% if clientes %}
+      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
 ),
 CTE_FACTURACION AS (
@@ -93,11 +96,11 @@ CTE_FACTURACION AS (
         ON fac.ID_CLIENTE = c.ID_CLIENTE
     WHERE f.FECHA >= TRUNC(TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD'), 'MM')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('RAZON_SOCIAL') %}
-      AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+      {% if clientes %}
+      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
 )
 SELECT

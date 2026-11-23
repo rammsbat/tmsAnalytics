@@ -8,6 +8,9 @@
 
 {% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
 {% set fecha_inicio = from_dttm[:10] if from_dttm else '2026-11-01' %}
+{% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
+{% set operadores = filter_values('NOMBRE_OPERADOR') or filter_values('OPERADOR') %}
+{% set clientes = filter_values('RAZON_SOCIAL') or filter_values('CLIENTE') %}
 
 WITH CTE_DESPACHO AS (
     SELECT
@@ -31,14 +34,14 @@ WITH CTE_DESPACHO AS (
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
-      {% if filter_values('NOMBRE_OPERADOR') %}
-      AND o.NOMBRE_OPERADOR IN {{ filter_values('NOMBRE_OPERADOR') | where_in }}
+      {% if operadores %}
+      AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('RAZON_SOCIAL') %}
-      AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+      {% if clientes %}
+      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         o.CODIGO_OPERADOR,
@@ -63,14 +66,14 @@ CTE_CARGA_CCP AS (
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
-      {% if filter_values('NOMBRE_OPERADOR') %}
-      AND o.NOMBRE_OPERADOR IN {{ filter_values('NOMBRE_OPERADOR') | where_in }}
+      {% if operadores %}
+      AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('RAZON_SOCIAL') %}
-      AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+      {% if clientes %}
+      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         cp.UUID_CCP,
@@ -106,14 +109,14 @@ CTE_FACTURACION AS (
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
-      {% if filter_values('NOMBRE_OPERADOR') %}
-      AND o.NOMBRE_OPERADOR IN {{ filter_values('NOMBRE_OPERADOR') | where_in }}
+      {% if operadores %}
+      AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
-      {% if filter_values('RAZON_SOCIAL') %}
-      AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+      {% if clientes %}
+      AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
       {% endif %}
     GROUP BY
         o.CODIGO_OPERADOR,
@@ -137,11 +140,11 @@ CTE_GASTOS AS (
     WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
       AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
       AND o.ID_OPERADOR <> -1
-      {% if filter_values('NOMBRE_OPERADOR') %}
-      AND o.NOMBRE_OPERADOR IN {{ filter_values('NOMBRE_OPERADOR') | where_in }}
+      {% if operadores %}
+      AND o.NOMBRE_OPERADOR IN {{ operadores | where_in }}
       {% endif %}
-      {% if filter_values('CODIGO_ECO') %}
-      AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+      {% if ecos %}
+      AND v.CODIGO_ECO IN {{ ecos | where_in }}
       {% endif %}
     GROUP BY
         o.CODIGO_OPERADOR,

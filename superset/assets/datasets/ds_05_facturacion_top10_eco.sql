@@ -7,6 +7,8 @@
 
 {% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
 {% set fecha_inicio = from_dttm[:10] if from_dttm else '2026-11-01' %}
+{% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
+{% set clientes = filter_values('RAZON_SOCIAL') or filter_values('CLIENTE') %}
 
 SELECT
     v.CODIGO_ECO                                               AS UNIDAD,
@@ -25,11 +27,11 @@ JOIN BI_SEMANTIC.VW_DIM_CLIENTE c
 WHERE f.FECHA >= TO_DATE('{{ fecha_inicio }}', 'YYYY-MM-DD')
   AND f.FECHA <= TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
   AND v.ID_VEHICULO <> -1
-  {% if filter_values('CODIGO_ECO') %}
-  AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+  {% if ecos %}
+  AND v.CODIGO_ECO IN {{ ecos | where_in }}
   {% endif %}
-  {% if filter_values('RAZON_SOCIAL') %}
-  AND c.RAZON_SOCIAL IN {{ filter_values('RAZON_SOCIAL') | where_in }}
+  {% if clientes %}
+  AND c.RAZON_SOCIAL IN {{ clientes | where_in }}
   {% endif %}
 GROUP BY
     v.CODIGO_ECO

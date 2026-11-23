@@ -7,16 +7,17 @@
 -- =============================================================================
 
 {% set fecha_corte = to_dttm[:10] if to_dttm else '2026-11-06' %}
+{% set ecos = filter_values('CODIGO_ECO') or filter_values('UNIDAD') %}
 
 SELECT
     f.FECHA                                                    AS FECHA_CORTE,
-    COUNT(s.ID_VEHICULO)                                       AS TOTAL_UNIDADES_FLOTA,
-    SUM(s.UNIDAD_CON_VIAJE_INDICADOR)                          AS UNIDADES_CON_VIAJE,
-    SUM(s.UNIDAD_SIN_VIAJE_INDICADOR)                          AS UNIDADES_SIN_VIAJE,
-    SUM(s.UNIDAD_INACTIVA_INDICADOR)                           AS UNIDADES_INACTIVAS,
-    ROUND(SUM(s.UNIDAD_CON_VIAJE_INDICADOR) * 100.0 / NULLIF(COUNT(s.ID_VEHICULO), 0), 2) AS PCT_CON_VIAJE,
-    ROUND(SUM(s.UNIDAD_SIN_VIAJE_INDICADOR) * 100.0 / NULLIF(COUNT(s.ID_VEHICULO), 0), 2) AS PCT_SIN_VIAJE,
-    ROUND(SUM(s.UNIDAD_INACTIVA_INDICADOR)  * 100.0 / NULLIF(COUNT(s.ID_VEHICULO), 0), 2) AS PCT_INACTIVAS,
+    CASE 
+        WHEN s.UNIDAD_CON_VIAJE_INDICADOR = 1 THEN 'Con Viaje'
+        WHEN s.UNIDAD_SIN_VIAJE_INDICADOR = 1 THEN 'Sin Viaje'
+        ELSE 'Inactivas'
+    END                                                        AS ESTADO_FLOTA,
+    COUNT(s.ID_VEHICULO)                                       AS CANTIDAD_UNIDADES,
+    ROUND(COUNT(s.ID_VEHICULO) * 100.0 / NULLIF(SUM(COUNT(s.ID_VEHICULO)) OVER (), 0), 2) AS PORCENTAJE_FLOTA,
     SUM(s.KMS_RECORRIDOS_DIA)                                  AS TOTAL_KMS_DIA,
     SUM(s.KWH_CONSUMO_DIA)                                     AS TOTAL_KWH_DIA
 FROM BI_SEMANTIC.VW_FACT_SNAPSHOT_FLOTA_DIARIO s
@@ -26,8 +27,13 @@ JOIN BI_SEMANTIC.VW_DIM_VEHICULO v
     ON s.ID_VEHICULO = v.ID_VEHICULO
 WHERE f.FECHA = TO_DATE('{{ fecha_corte }}', 'YYYY-MM-DD')
   AND s.ID_VEHICULO <> -1
-  {% if filter_values('CODIGO_ECO') %}
-  AND v.CODIGO_ECO IN {{ filter_values('CODIGO_ECO') | where_in }}
+  {% if ecos %}
+  AND v.CODIGO_ECO IN {{ ecos | where_in }}
   {% endif %}
 GROUP BY
-    f.FECHA
+    f.FECHA,
+    CASE 
+        WHEN s.UNIDAD_CON_VIAJE_INDICADOR = 1 THEN 'Con Viaje'
+        WHEN s.UNIDAD_SIN_VIAJE_INDICADOR = 1 THEN 'Sin Viaje'
+        ELSE 'Inactivas'
+    END
