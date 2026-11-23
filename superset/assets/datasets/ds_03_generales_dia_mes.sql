@@ -104,5 +104,5 @@ SELECT
     NVL(fac.FACTURADO_DIA, 0)                                                    AS FACTURADO_DIA,
     NVL(fac.FACTURADO_MES, 0)                                                    AS FACTURADO_MES
 FROM CTE_DESPACHOS_GEN d
-JOIN CTE_GASTOS_GEN g      ON d.JOIN_KEY = g.JOIN_KEY
-JOIN CTE_FACTURACION_GEN fac ON d.JOIN_KEY = fac.JOIN_KEY
+FULL OUTER JOIN CTE_GASTOS_GEN g        USING (JOIN_KEY)
+FULL OUTER JOIN CTE_FACTURACION_GEN fac USING (JOIN_KEY)

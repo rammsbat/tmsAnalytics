@@ -80,8 +80,8 @@ sql: "-- =======================================================================
   \ AS PAGO_OPERADORES_MES,\n    NVL(fac.FACTURADO_DIA, 0)                       \
   \                             AS FACTURADO_DIA,\n    NVL(fac.FACTURADO_MES, 0) \
   \                                                   AS FACTURADO_MES\nFROM CTE_DESPACHOS_GEN\
-  \ d\nJOIN CTE_GASTOS_GEN g      ON d.JOIN_KEY = g.JOIN_KEY\nJOIN CTE_FACTURACION_GEN\
-  \ fac ON d.JOIN_KEY = fac.JOIN_KEY\n"
+  \ d\nFULL OUTER JOIN CTE_GASTOS_GEN g        USING (JOIN_KEY)\nFULL OUTER JOIN CTE_FACTURACION_GEN\
+  \ fac USING (JOIN_KEY)\n"
 params: null
 template_params: null
 filter_select_enabled: true
